@@ -78,10 +78,40 @@ function toast(msg) {
     el.className = "toast";
     document.body.appendChild(el);
   }
-  el.textContent = msg;
+  el.innerHTML = `${icon("check")}<span>${msg}</span>`;
   el.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+/* ---------------- انیمیشن ورود ---------------- */
+const revealObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) {
+          e.target.classList.add("in");
+          revealObserver.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -30px 0px" })
+  : null;
+
+function observeReveals(root = document) {
+  if (!revealObserver) {
+    qsa(".reveal", root).forEach((el) => el.classList.add("in"));
+    return;
+  }
+  qsa(".reveal:not(.in)", root).forEach((el) => revealObserver.observe(el));
+}
+
+/* افزودن reveal پلکانی به فرزندان یک گرید */
+function staggerReveal(container) {
+  if (!container) return;
+  [...container.children].forEach((el, i) => {
+    el.classList.add("reveal");
+    el.style.transitionDelay = `${Math.min(i * 60, 360)}ms`;
+  });
+  observeReveals(container);
 }
 
 /* ---------------- هدر / فوتر / منوی پایین ---------------- */
@@ -106,7 +136,7 @@ function renderHeader() {
   header.innerHTML = `
     <div class="container header-inner">
       <a class="logo" href="${PAGE("index")}" aria-label="پرودید">
-        <span class="logo-badge">🥩</span>
+        <span class="logo-mark">${icon("steak")}</span>
         <span class="logo-text">
           <span class="logo-name">پرودید</span><br>
           <span class="logo-slogan">${BRAND.slogan}</span>
@@ -114,12 +144,15 @@ function renderHeader() {
       </a>
       <form class="header-search" id="search-desktop" role="search">
         <input type="search" name="q" placeholder="جست‌وجوی محصول؛ مثلا کباب، ژامبون…" aria-label="جست‌وجو">
-        <span class="search-ico">🔍</span>
+        <span class="search-ico">${icon("search")}</span>
       </form>
+      <a class="header-phone" href="tel:${BRAND.phone}">
+        ${icon("phone")}
+        <span>سفارش تلفنی <b class="num">${toFa(BRAND.phone)}</b></span>
+      </a>
       <div class="header-actions">
-        <a class="icon-btn" href="tel:${BRAND.phone}" title="تماس با فروشگاه">📞</a>
-        <a class="icon-btn" href="${PAGE("account")}" title="حساب کاربری">👤</a>
-        <a class="icon-btn" href="${PAGE("cart")}" title="سبد خرید">🛒<span class="cart-badge" data-cart-badge></span></a>
+        <a class="icon-btn" href="${PAGE("account")}" title="حساب کاربری">${icon("user")}</a>
+        <a class="icon-btn" href="${PAGE("cart")}" title="سبد خرید">${icon("cart")}<span class="cart-badge" data-cart-badge></span></a>
       </div>
     </div>
     <nav class="main-nav" aria-label="منوی اصلی">
@@ -132,7 +165,7 @@ function renderHeader() {
     <div class="mobile-search">
       <form class="header-search" id="search-mobile" role="search">
         <input type="search" name="q" placeholder="جست‌وجوی محصول؛ مثلا کباب، ژامبون…" aria-label="جست‌وجو">
-        <span class="search-ico">🔍</span>
+        <span class="search-ico">${icon("search")}</span>
       </form>
     </div>`;
   document.body.prepend(header);
@@ -152,15 +185,15 @@ function renderBottomNav() {
   nav.className = "bottom-nav";
   nav.setAttribute("aria-label", "منوی موبایل");
   const items = [
-    { id: "index", label: "خانه", ico: "🏠" },
-    { id: "shop", label: "فروشگاه", ico: "🛍️" },
-    { id: "cart", label: "سبد خرید", ico: "🛒", badge: true },
-    { id: "account", label: "حساب", ico: "👤" },
+    { id: "index", label: "خانه", ico: "home" },
+    { id: "shop", label: "فروشگاه", ico: "store" },
+    { id: "cart", label: "سبد خرید", ico: "cart", badge: true },
+    { id: "account", label: "حساب", ico: "user" },
   ];
   nav.innerHTML = items
     .map((it) => `
       <a href="${PAGE(it.id)}" class="${page === it.id ? "active" : ""}">
-        <span class="bn-ico">${it.ico}</span>${it.label}
+        ${icon(it.ico)}${it.label}
         ${it.badge ? '<span class="cart-badge" data-cart-badge></span>' : ""}
       </a>`)
     .join("");
@@ -190,10 +223,10 @@ function renderFooter() {
         </div>
         <div>
           <h4>تماس با ما</h4>
-          <div class="footer-contact-line">📍 <span>${BRAND.address}</span></div>
-          <div class="footer-contact-line">📞 <a href="tel:${BRAND.phone}" class="num">${toFa(BRAND.phone)}</a></div>
-          <div class="footer-contact-line">📷 <a href="${BRAND.instagramUrl}" target="_blank" rel="noopener">اینستاگرام ${BRAND.instagram}@</a></div>
-          <div class="footer-contact-line">💬 <a href="https://wa.me/${BRAND.phoneIntl}" target="_blank" rel="noopener">سفارش در واتس‌اپ</a></div>
+          <div class="footer-contact-line">${icon("pin")}<span>${BRAND.address}</span></div>
+          <div class="footer-contact-line">${icon("phone")}<a href="tel:${BRAND.phone}" class="num">${toFa(BRAND.phone)}</a></div>
+          <div class="footer-contact-line">${icon("instagram")}<a href="${BRAND.instagramUrl}" target="_blank" rel="noopener">اینستاگرام ${BRAND.instagram}@</a></div>
+          <div class="footer-contact-line">${icon("chat")}<a href="https://wa.me/${BRAND.phoneIntl}" target="_blank" rel="noopener">سفارش در واتس‌اپ</a></div>
         </div>
       </div>
       <div class="footer-bottom">
@@ -214,7 +247,7 @@ function productImg(p, cls = "p-img") {
   // در غیر این صورت آیکن دسته‌بندی نشان داده می‌شود.
   return `
     <div class="${cls}">
-      <span class="p-emoji">${p.emoji}</span>
+      ${icon(p.ic, "p-ico")}
       <img src="${ROOT}assets/img/products/${p.id}.jpg" alt="${p.name}" loading="lazy"
            onerror="this.remove()">
     </div>`;
@@ -223,31 +256,31 @@ function productImg(p, cls = "p-img") {
 function saleBadge(p) {
   if (!p.available) return '<span class="badge badge-out">ناموجود</span>';
   return p.sale === "w"
-    ? '<span class="badge badge-weight">وزنی</span>'
-    : '<span class="badge badge-unit">عددی</span>';
+    ? `<span class="badge badge-weight">${icon("scale")}وزنی</span>`
+    : `<span class="badge badge-unit">${icon("package")}عددی</span>`;
 }
 
 function priceHTML(p) {
-  if (p.price === null) return '<span class="p-price-call">استعلام قیمت ☎️</span>';
+  if (p.price === null) return '<span class="p-price-call">استعلام قیمت</span>';
   return `<span class="p-price">${fmtPrice(p.price)}</span>
           <span class="p-price-unit">${unitLabel(p)}</span>`;
 }
 
 function cardActionHTML(p) {
-  if (!p.available) return '<button class="p-add out" disabled>ناموجود</button>';
+  if (!p.available) return `<button class="p-add out" disabled title="ناموجود">${icon("close")}</button>`;
   if (p.price === null)
-    return `<a class="p-add" href="tel:${BRAND.phone}">📞 تماس برای سفارش</a>`;
+    return `<a class="p-add" href="tel:${BRAND.phone}" title="تماس برای سفارش">${icon("phone")}</a>`;
   const inCart = Cart.qty(p.id);
   if (inCart > 0) return stepperHTML(p, inCart);
-  return `<button class="p-add" data-add="${p.id}">🛒 افزودن به سبد</button>`;
+  return `<button class="p-add" data-add="${p.id}" title="افزودن به سبد">${icon("plus")}</button>`;
 }
 
 function stepperHTML(p, qty) {
   return `
     <div class="p-stepper" data-stepper="${p.id}">
-      <button type="button" data-inc="${p.id}" aria-label="افزایش">＋</button>
+      <button type="button" data-inc="${p.id}" aria-label="افزایش">${icon("plus")}</button>
       <span class="st-val">${qtyLabel(p, qty)}</span>
-      <button type="button" data-dec="${p.id}" aria-label="کاهش">－</button>
+      <button type="button" data-dec="${p.id}" aria-label="کاهش">${icon("minus")}</button>
     </div>`;
 }
 
@@ -263,8 +296,10 @@ function productCard(p) {
       </a>
       <div class="p-body">
         <a href="${PAGE("product")}?id=${p.id}"><h3 class="p-name">${p.name}</h3></a>
-        <div class="p-price-row">${priceHTML(p)}</div>
-        <div class="card-action">${cardActionHTML(p)}</div>
+        <div class="p-foot">
+          <div class="p-price-row">${priceHTML(p)}</div>
+          <div class="card-action">${cardActionHTML(p)}</div>
+        </div>
       </div>
     </article>`;
 }
@@ -327,6 +362,7 @@ const Orders = {
 
 /* ---------------- راه‌اندازی مشترک ---------------- */
 document.addEventListener("DOMContentLoaded", () => {
+  hydrateIcons();
   renderHeader();
   renderBottomNav();
   renderFooter();
@@ -343,6 +379,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }[page];
   if (init) init();
   else bindCartEvents();
+
+  observeReveals();
 });
 
 /* =========================================================
@@ -356,19 +394,22 @@ function initHome() {
     <a class="cat-card" href="${c.soon ? "#" : `${PAGE("shop")}?cat=${c.id}`}"
        ${c.soon ? 'onclick="toast(\'این دسته به‌زودی تکمیل می‌شود\');return false;"' : ""}>
       ${c.soon ? '<span class="soon-tag">به‌زودی</span>' : ""}
-      <span class="c-emoji">${c.emoji}</span>
+      <span class="c-ico">${icon(c.ic)}</span>
       <span class="c-name">${c.name}</span>
     </a>`).join("");
+  staggerReveal(qs("#home-cats"));
 
   // پرفروش‌ها
   const best = PRODUCTS.filter((p) => p.badge === "پرفروش")
     .concat(PRODUCTS.filter((p) => p.badge === "ویژه"))
     .slice(0, 4);
   qs("#home-best").innerHTML = best.map(productCard).join("");
+  staggerReveal(qs("#home-best"));
 
-  // تازه‌های امروز (نمونه: سبزیجات و کبابی)
+  // تازه‌های امروز
   const fresh = PRODUCTS.filter((p) => ["veg", "kebab"].includes(p.cat)).slice(0, 4);
   qs("#home-fresh").innerHTML = fresh.map(productCard).join("");
+  staggerReveal(qs("#home-fresh"));
 }
 
 /* =========================================================
@@ -381,15 +422,14 @@ function initShop() {
   const state = {
     cat: params.get("cat") || "all",
     q: params.get("q") || "",
-    type: "all",       // all | w | u
+    type: "all",
     onlyAvailable: false,
-    sort: "default",   // default | price-asc | price-desc | name
+    sort: "default",
   };
 
-  // چیپ‌های دسته‌بندی
-  const cats = [{ id: "all", name: "همه", emoji: "" }, ...CATEGORIES.filter((c) => !c.soon)];
+  const cats = [{ id: "all", name: "همه" }, ...CATEGORIES.filter((c) => !c.soon)];
   qs("#shop-chips").innerHTML = cats.map((c) =>
-    `<button class="chip ${state.cat === c.id ? "active" : ""}" data-cat="${c.id}">${c.emoji ? c.emoji + " " : ""}${c.name}</button>`
+    `<button class="chip ${state.cat === c.id ? "active" : ""}" data-cat="${c.id}">${c.name}</button>`
   ).join("");
 
   if (state.q) {
@@ -410,16 +450,16 @@ function initShop() {
     if (state.sort === "price-desc") list.sort((a, b) => (b.price ?? -1) - (a.price ?? -1));
     if (state.sort === "name") list.sort((a, b) => a.name.localeCompare(b.name, "fa"));
 
-    qs("#shop-count").textContent = list.length
-      ? `${faNum.format(list.length)} محصول`
-      : "";
-    qs("#shop-grid").innerHTML = list.length
+    qs("#shop-count").textContent = list.length ? `${faNum.format(list.length)} محصول` : "";
+    const grid = qs("#shop-grid");
+    grid.innerHTML = list.length
       ? list.map(productCard).join("")
       : `<div class="empty-state" style="grid-column:1/-1">
-           <div class="e-ico">🔍</div>
+           <div class="e-ico">${icon("search")}</div>
            <b>محصولی پیدا نشد</b>
            جست‌وجو یا فیلترها را تغییر دهید.
          </div>`;
+    if (list.length) staggerReveal(grid);
   }
 
   qs("#shop-chips").addEventListener("click", (e) => {
@@ -449,9 +489,9 @@ function initProductPage() {
   if (!p) {
     wrap.innerHTML = `
       <div class="empty-state">
-        <div class="e-ico">😕</div>
+        <div class="e-ico">${icon("search")}</div>
         <b>محصول پیدا نشد</b>
-        <a class="btn btn-green mt-2" href="${PAGE("shop")}">رفتن به فروشگاه</a>
+        <div class="mt-2"><a class="btn btn-primary" href="${PAGE("shop")}">رفتن به فروشگاه</a></div>
       </div>`;
     return;
   }
@@ -460,7 +500,7 @@ function initProductPage() {
   const cat = getCategory(p.cat);
 
   wrap.innerHTML = `
-    <nav class="muted" style="font-size:.8rem" aria-label="مسیر">
+    <nav class="breadcrumb" aria-label="مسیر">
       <a href="${PAGE("index")}">خانه</a> ‹
       <a href="${PAGE("shop")}">فروشگاه</a> ‹
       <a href="${PAGE("shop")}?cat=${p.cat}">${cat.name}</a> ‹
@@ -472,42 +512,44 @@ function initProductPage() {
         <div class="p-meta">
           ${p.badge ? `<span class="badge badge-gold">${p.badge}</span>` : ""}
           ${saleBadge(p)}
-          <span class="badge" style="background:var(--green-50);color:var(--green-800)">${cat.emoji} ${cat.name}</span>
+          <span class="badge" style="background:var(--gold-tint);color:var(--gold-deep)">${cat.name}</span>
         </div>
         <h1>${p.name}</h1>
         <p class="product-desc">${p.desc}</p>
         <div class="price-box">
           <div class="p-price-row">${priceHTML(p)}</div>
           ${p.sale === "w" && p.price !== null ? `
-            <div class="weight-note">⚖️
+            <div class="note-box">${icon("scale")}
               <span>این محصول <b>وزنی</b> است؛ قیمت بالا برای هر کیلوگرم است و
               مبلغ نهایی سفارش شما پس از وزن‌کشی دقیق مشخص و اطلاع‌رسانی می‌شود.</span>
             </div>` : ""}
           ${p.price === null ? `
-            <div class="weight-note">☎️
+            <div class="note-box">${icon("phone")}
               <span>قیمت این محصول روزانه تغییر می‌کند؛ برای استعلام و سفارش با
               <a href="tel:${BRAND.phone}" class="num"><b>${toFa(BRAND.phone)}</b></a> تماس بگیرید.</span>
             </div>` : ""}
         </div>
         <div id="product-action"></div>
-        <a class="btn btn-outline btn-block mt-1" href="tel:${BRAND.phone}">📞 سوال دارید؟ تماس بگیرید</a>
+        <a class="btn btn-outline btn-block mt-2" href="tel:${BRAND.phone}">${icon("headset")} سوال دارید؟ تماس بگیرید</a>
       </div>
     </div>
     <section class="section">
       <div class="section-head"><h2 class="section-title">محصولات مرتبط</h2></div>
-      <div class="products-grid">
+      <div class="products-grid" id="related-grid">
         ${PRODUCTS.filter((x) => x.cat === p.cat && x.id !== p.id).slice(0, 4).map(productCard).join("")}
       </div>
     </section>`;
 
+  staggerReveal(qs("#related-grid"));
+
   function syncProductQty() {
     const action = qs("#product-action");
     if (!p.available) {
-      action.innerHTML = '<button class="btn btn-block" disabled style="background:#eceff1;color:#90a4ae">ناموجود</button>';
+      action.innerHTML = '<button class="btn btn-block" disabled style="background:#eee9dd;color:#a39a89">ناموجود</button>';
       return;
     }
     if (p.price === null) {
-      action.innerHTML = `<a class="btn btn-gold btn-block" href="tel:${BRAND.phone}">📞 تماس برای سفارش</a>`;
+      action.innerHTML = `<a class="btn btn-primary btn-block" href="tel:${BRAND.phone}">${icon("phone")} تماس برای سفارش</a>`;
       return;
     }
     const inCart = Cart.qty(p.id);
@@ -515,14 +557,14 @@ function initProductPage() {
       action.innerHTML = `
         <div class="qty-row">
           <div class="qty-stepper">
-            <button type="button" data-inc="${p.id}">＋</button>
+            <button type="button" data-inc="${p.id}">${icon("plus")}</button>
             <span class="qty-val">${qtyLabel(p, inCart)}</span>
-            <button type="button" data-dec="${p.id}">－</button>
+            <button type="button" data-dec="${p.id}">${icon("minus")}</button>
           </div>
-          <a class="btn btn-gold" style="flex:1" href="${PAGE("cart")}">مشاهده سبد و ادامه خرید</a>
+          <a class="btn btn-primary" style="flex:1" href="${PAGE("cart")}">مشاهده سبد و ادامه خرید</a>
         </div>`;
     } else {
-      action.innerHTML = `<button class="btn btn-gold btn-block" data-add="${p.id}">🛒 افزودن به سبد خرید</button>`;
+      action.innerHTML = `<button class="btn btn-primary btn-block" data-add="${p.id}">${icon("cart")} افزودن به سبد خرید</button>`;
     }
   }
   syncProductQty();
@@ -541,10 +583,10 @@ function initCartPage() {
     if (!items.length) {
       wrap.innerHTML = `
         <div class="empty-state">
-          <div class="e-ico">🛒</div>
+          <div class="e-ico">${icon("cart")}</div>
           <b>سبد خرید شما خالی است</b>
           از فروشگاه، محصولات تازه و خوشمزه انتخاب کنید.
-          <div class="mt-2"><a class="btn btn-gold" href="${PAGE("shop")}">رفتن به فروشگاه</a></div>
+          <div class="mt-2"><a class="btn btn-primary" href="${PAGE("shop")}">رفتن به فروشگاه</a></div>
         </div>`;
       return;
     }
@@ -558,7 +600,7 @@ function initCartPage() {
           ${items.map(({ p, qty }) => `
             <div class="cart-item" data-card="${p.id}">
               <a class="ci-img" href="${PAGE("product")}?id=${p.id}">
-                ${p.emoji}
+                ${icon(p.ic)}
                 <img src="${ROOT}assets/img/products/${p.id}.jpg" alt="" onerror="this.remove()">
               </a>
               <div>
@@ -568,7 +610,7 @@ function initCartPage() {
               </div>
               <div class="ci-side">
                 ${stepperHTML(p, qty)}
-                <button class="ci-remove" data-remove="${p.id}">حذف ✕</button>
+                <button class="ci-remove" data-remove="${p.id}">${icon("trash")}حذف</button>
               </div>
             </div>`).join("")}
         </div>
@@ -577,15 +619,15 @@ function initCartPage() {
           <div class="sum-row"><span>تعداد اقلام</span><span>${faNum.format(items.length)}</span></div>
           <div class="sum-row total"><span>جمع کل${Cart.hasWeightItems() ? " (تقریبی)" : ""}</span><span>${fmtPrice(total)} تومان</span></div>
           ${Cart.hasWeightItems() ? `
-            <p class="sum-note">⚖️ سبد شما شامل محصولات وزنی است؛ مبلغ نهایی پس از وزن‌کشی دقیق مشخص می‌شود.</p>` : ""}
-          <p class="sum-note">🛵 ${BRAND.deliveryFeeNote}.</p>
+            <p class="sum-note">${icon("scale")}<span>سبد شما شامل محصولات وزنی است؛ مبلغ نهایی پس از وزن‌کشی دقیق مشخص می‌شود.</span></p>` : ""}
+          <p class="sum-note">${icon("truck")}<span>${BRAND.deliveryFeeNote}.</span></p>
           ${underMin ? `
             <div class="min-order-warn">حداقل مبلغ سفارش ${fmtPrice(BRAND.minOrder)} تومان است.
             ${fmtPrice(BRAND.minOrder - total)} تومان دیگر به سبد اضافه کنید.</div>` : ""}
-          <a class="btn btn-gold btn-block ${underMin ? "disabled" : ""}"
+          <a class="btn btn-primary btn-block ${underMin ? "disabled" : ""}"
              href="${underMin ? "#" : PAGE("checkout")}"
              ${underMin ? 'onclick="toast(\'مبلغ سفارش به حداقل نرسیده است\');return false;"' : ""}>
-             ادامه و تسویه حساب ←</a>
+             ادامه و تسویه حساب</a>
           <a class="btn btn-light btn-block mt-1" href="${PAGE("shop")}">ادامه خرید</a>
         </aside>
       </div>`;
@@ -616,9 +658,9 @@ function initCheckoutPage() {
   if (!items.length) {
     wrap.innerHTML = `
       <div class="empty-state">
-        <div class="e-ico">🛒</div>
+        <div class="e-ico">${icon("cart")}</div>
         <b>سبدی برای تسویه وجود ندارد</b>
-        <div class="mt-2"><a class="btn btn-gold" href="${PAGE("shop")}">رفتن به فروشگاه</a></div>
+        <div class="mt-2"><a class="btn btn-primary" href="${PAGE("shop")}">رفتن به فروشگاه</a></div>
       </div>`;
     return;
   }
@@ -652,7 +694,7 @@ function initCheckoutPage() {
               <textarea id="f-address" name="address" rows="3" required placeholder="محله، خیابان، کوچه، پلاک، واحد">${profile.address || ""}</textarea>
             </div>
           </div>
-          <p class="muted mt-1">🛵 ارسال فقط در محدوده شهر ${BRAND.city} انجام می‌شود؛ ${BRAND.deliveryFeeNote}.</p>
+          <p class="muted mt-1">ارسال فقط در محدوده شهر ${BRAND.city} انجام می‌شود؛ ${BRAND.deliveryFeeNote}.</p>
         </div>
 
         <div class="form-card">
@@ -676,17 +718,17 @@ function initCheckoutPage() {
           <h3><span class="step-num">۴</span> روش پرداخت</h3>
           <label class="pay-option">
             <input type="radio" name="pay" value="کارت به کارت" checked>
-            <span><b>کارت به کارت 💳</b>
+            <span><b>${icon("card")} کارت به کارت</b>
             <span>شماره کارت پس از تایید سفارش برای شما ارسال می‌شود.</span></span>
           </label>
           <label class="pay-option">
             <input type="radio" name="pay" value="پرداخت در محل">
-            <span><b>پرداخت در محل تحویل 🏠</b>
+            <span><b>${icon("wallet")} پرداخت در محل تحویل</b>
             <span>پرداخت با کارت‌خوان سیار یا نقدی هنگام تحویل.</span></span>
           </label>
-          <label class="pay-option" style="opacity:.6">
+          <label class="pay-option" style="opacity:.55">
             <input type="radio" name="pay" value="پرداخت آنلاین" disabled>
-            <span><b>پرداخت آنلاین <span class="soon-chip">به‌زودی</span></b>
+            <span><b>${icon("card")} پرداخت آنلاین <span class="soon-chip">به‌زودی</span></b>
             <span>اتصال به درگاه پرداخت اینترنتی در حال راه‌اندازی است.</span></span>
           </label>
         </div>
@@ -705,15 +747,14 @@ function initCheckoutPage() {
             <span>${fmtPrice(p.price * qty)}</span>
           </div>`).join("")}
         <div class="sum-row total"><span>جمع کل${Cart.hasWeightItems() ? " (تقریبی)" : ""}</span><span>${fmtPrice(total)} تومان</span></div>
-        ${Cart.hasWeightItems() ? `<p class="sum-note">⚖️ مبلغ نهایی محصولات وزنی پس از وزن‌کشی مشخص و پیش از ارسال به شما اطلاع داده می‌شود.</p>` : ""}
-        <p class="sum-note">🛵 ${BRAND.deliveryFeeNote}.</p>
-        <button type="submit" class="btn btn-gold btn-block">ثبت نهایی سفارش در واتس‌اپ 💬</button>
-        <a class="btn btn-outline btn-block mt-1" href="tel:${BRAND.phone}">ثبت سفارش با تماس 📞</a>
-        <p class="sum-note text-center">با ثبت سفارش، <a href="${PAGE("terms")}" style="color:var(--green-700)"><b>قوانین فروشگاه</b></a> را می‌پذیرید.</p>
+        ${Cart.hasWeightItems() ? `<p class="sum-note">${icon("scale")}<span>مبلغ نهایی محصولات وزنی پس از وزن‌کشی مشخص و پیش از ارسال به شما اطلاع داده می‌شود.</span></p>` : ""}
+        <p class="sum-note">${icon("truck")}<span>${BRAND.deliveryFeeNote}.</span></p>
+        <button type="submit" class="btn btn-primary btn-block">${icon("chat")} ثبت نهایی سفارش در واتس‌اپ</button>
+        <a class="btn btn-outline btn-block mt-1" href="tel:${BRAND.phone}">${icon("phone")} ثبت سفارش با تماس</a>
+        <p class="sum-note text-center" style="display:block">با ثبت سفارش، <a href="${PAGE("terms")}" style="color:var(--wine)"><b>قوانین فروشگاه</b></a> را می‌پذیرید.</p>
       </aside>
     </form>`;
 
-  // انتخاب بازه زمانی
   let selectedSlot = SLOTS[0];
   qs("#slot-grid").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-slot]");
@@ -737,7 +778,6 @@ function initCheckoutPage() {
       return;
     }
 
-    // ذخیره پروفایل برای خرید بعدی
     Profile.write({ name, phone, address });
 
     const day = form.day.value;
@@ -745,18 +785,18 @@ function initCheckoutPage() {
     const notes = form.notes.value.trim();
 
     const lines = [
-      "🥩 *سفارش جدید از سایت پرودید*",
+      "*سفارش جدید از سایت پرودید*",
       "──────────────",
       ...items.map(({ p, qty }, i) =>
         `${faNum.format(i + 1)}. ${p.name} — ${qtyLabel(p, qty)} — ${fmtPrice(p.price * qty)} تومان${p.sale === "w" ? " (تقریبی)" : ""}`),
       "──────────────",
-      `💰 جمع کل${Cart.hasWeightItems() ? " (تقریبی)" : ""}: ${fmtPrice(total)} تومان`,
-      `👤 گیرنده: ${name}`,
-      `📱 موبایل: ${phone}`,
-      `📍 آدرس: ${address}`,
-      `⏰ زمان تحویل: ${day} — ساعت ${selectedSlot}`,
-      `💳 روش پرداخت: ${pay}`,
-      notes ? `📝 توضیحات: ${notes}` : "",
+      `جمع کل${Cart.hasWeightItems() ? " (تقریبی)" : ""}: ${fmtPrice(total)} تومان`,
+      `گیرنده: ${name}`,
+      `موبایل: ${phone}`,
+      `آدرس: ${address}`,
+      `زمان تحویل: ${day} — ساعت ${selectedSlot}`,
+      `روش پرداخت: ${pay}`,
+      notes ? `توضیحات: ${notes}` : "",
     ].filter(Boolean);
 
     Orders.add({
@@ -775,15 +815,14 @@ function initCheckoutPage() {
   });
 }
 
-/* نمایش پیام موفقیت بعد از ثبت */
 function checkoutSuccessHTML() {
   return `
     <div class="success-box">
-      <div class="s-ico">✅</div>
+      <div class="s-ico">${icon("check")}</div>
       <h2>سفارش شما ثبت شد!</h2>
       <p>جزئیات سفارش در واتس‌اپ برای فروشگاه ارسال شد. همکاران ما به‌زودی
       برای تایید نهایی و اعلام مبلغ دقیق (محصولات وزنی) با شما تماس می‌گیرند.</p>
-      <a class="btn btn-gold btn-block" href="${PAGE("shop")}">بازگشت به فروشگاه</a>
+      <a class="btn btn-primary btn-block" href="${PAGE("shop")}">بازگشت به فروشگاه</a>
       <a class="btn btn-light btn-block mt-1" href="${PAGE("account")}">مشاهده سفارش‌های من</a>
     </div>`;
 }
@@ -809,7 +848,7 @@ function initAccountPage() {
         <label for="a-address">آدرس پیش‌فرض</label>
         <textarea id="a-address" name="address" rows="3" placeholder="محله، خیابان، کوچه، پلاک">${profile.address || ""}</textarea>
       </div>
-      <button type="submit" class="btn btn-green">ذخیره اطلاعات</button>
+      <button type="submit" class="btn btn-dark">ذخیره اطلاعات</button>
     </div>`;
 
   qs("#profile-form").addEventListener("submit", (e) => {
@@ -820,16 +859,16 @@ function initAccountPage() {
       phone: f.phone.value.trim(),
       address: f.address.value.trim(),
     });
-    toast("اطلاعات شما ذخیره شد ✅");
+    toast("اطلاعات شما ذخیره شد");
   });
 
   const ordersWrap = qs("#orders-wrap");
   if (!orders.length) {
     ordersWrap.innerHTML = `
       <div class="empty-state">
-        <div class="e-ico">📦</div>
+        <div class="e-ico">${icon("package")}</div>
         <b>هنوز سفارشی ثبت نکرده‌اید</b>
-        <div class="mt-2"><a class="btn btn-gold" href="${PAGE("shop")}">اولین سفارش را ثبت کنید</a></div>
+        <div class="mt-2"><a class="btn btn-primary" href="${PAGE("shop")}">اولین سفارش را ثبت کنید</a></div>
       </div>`;
     return;
   }
@@ -840,7 +879,7 @@ function initAccountPage() {
         <span class="o-date">${new Date(o.date).toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric" })} — ${o.day}، ساعت ${o.slot}</span>
       </div>
       <div class="o-items">
-        ${o.items.map((it) => `${it.name} (${it.qty >= 1 || Number.isInteger(it.qty) ? faNum.format(it.qty) : faNum.format(it.qty)})`).join("، ")}
+        ${o.items.map((it) => `${it.name} (${faNum.format(it.qty)})`).join("، ")}
       </div>
       <div class="muted" style="font-size:.75rem">پرداخت: ${o.pay}</div>
     </div>`).join("");

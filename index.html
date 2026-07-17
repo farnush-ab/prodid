@@ -7,6 +7,54 @@
   <meta name="description" content="پرودید؛ فروشگاه تخصصی مواد پروتئینی در کاشان. گوشت و استیک تازه، کبابی و مزه‌دار، سوسیس و کالباس، برگر خانگی و سبزیجات نیمه‌آماده با ارسال همان‌روز.">
   <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
   <link rel="stylesheet" href="assets/css/styles.css">
+  <style>
+    /* هنر جایگزین هیرو وقتی عکس واقعی موجود نیست */
+    .hero-art {
+      display: none;
+      aspect-ratio: 4 / 3.4;
+      border-radius: 24px;
+      background:
+        radial-gradient(320px 320px at 50% 44%, rgba(189, 154, 72, 0.14), transparent 70%),
+        linear-gradient(155deg, #241d16, #14100d);
+      border: 1px solid rgba(189, 154, 72, 0.35);
+      position: relative;
+      place-items: center;
+      overflow: hidden;
+    }
+    .hero-visual.no-photo .hero-photo { display: none; }
+    .hero-visual.no-photo .hero-art { display: grid; }
+    .hero-art .ring {
+      position: absolute;
+      border: 1px solid rgba(189, 154, 72, 0.25);
+      border-radius: 50%;
+    }
+    .hero-art .ring-1 { width: 62%; aspect-ratio: 1; }
+    .hero-art .ring-2 { width: 82%; aspect-ratio: 1; border-style: dashed; opacity: .6; animation: spin 60s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hero-art .art-main {
+      width: 42%;
+      color: #d9c08a;
+      filter: drop-shadow(0 18px 30px rgba(0,0,0,.5));
+      animation: heroFloat 7s ease-in-out infinite;
+    }
+    .hero-art .art-main svg { width: 100%; height: 100%; stroke-width: .9; }
+    .hero-art .art-chip {
+      position: absolute;
+      background: rgba(28, 23, 18, 0.9);
+      border: 1px solid rgba(189, 154, 72, 0.4);
+      color: var(--on-dark);
+      border-radius: 14px;
+      padding: 8px 14px;
+      display: flex; align-items: center; gap: 8px;
+      font-size: .74rem; font-weight: 500;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+    }
+    .hero-art .art-chip .ico { width: 16px; height: 16px; color: var(--gold-soft); }
+    .hero-art .chip-a { top: 12%; right: 8%; animation: heroFloat 6s 0.4s ease-in-out infinite; }
+    .hero-art .chip-b { bottom: 16%; left: 7%; animation: heroFloat 6.8s 1.1s ease-in-out infinite; }
+    .hero-art .chip-c { top: 46%; left: 4%; animation: heroFloat 7.4s 0.8s ease-in-out infinite; }
+  </style>
 </head>
 <body data-page="index">
 
@@ -14,112 +62,150 @@
   <section class="hero">
     <div class="container hero-inner">
       <div>
-        <span class="hero-badge">🛵 ارسال همان‌روز در کاشان</span>
-        <h1>پرودید؛ <span class="accent">پروتئین هر خانه</span></h1>
+        <span class="hero-kicker">فروشگاه تخصصی پروتئین در کاشان</span>
+        <h1>پروتئینِ <span class="accent">هر خانه</span></h1>
+        <div class="hero-rule"></div>
         <p>
-          گوشت و استیک تازه، محصولات کبابی و مزه‌دار، سوسیس و کالباس ممتاز،
-          برگرهای خانگی و سبزیجات نیمه‌آماده — با چند کلیک سفارش دهید،
+          گوشت و استیک تازه، کبابی و مزه‌دار، سوسیس و کالباس ممتاز و برگرهای
+          دست‌ساز — هر روز تازه آماده می‌شود، شما فقط سفارش دهید؛ همان روز
           درب منزل تحویل بگیرید.
         </p>
         <div class="hero-ctas">
-          <a class="btn btn-gold" href="pages/shop.html">🛍️ شروع خرید</a>
-          <a class="btn btn-outline" style="border-color:rgba(255,255,255,.5);color:#fff" href="tel:09130612019">📞 سفارش تلفنی</a>
+          <a class="btn btn-primary" href="pages/shop.html"><span data-icon="basket"></span> سفارش آنلاین</a>
+          <a class="btn btn-outline-light" href="tel:09130612019"><span data-icon="phone"></span> سفارش تلفنی</a>
+        </div>
+        <div class="hero-marks">
+          <span class="hero-mark"><span data-icon="truck"></span> ارسال همان‌روز در کاشان</span>
+          <span class="hero-mark"><span data-icon="award"></span> کیفیت تضمینی</span>
+          <span class="hero-mark"><span data-icon="leaf"></span> تازه و روزانه</span>
         </div>
       </div>
-      <div class="hero-visual" aria-hidden="true">
-        <div class="hero-tile">🥩</div>
-        <div class="hero-tile gold">🍢</div>
-        <div class="hero-tile">🍔</div>
-        <div class="hero-tile gold">🥓</div>
-        <div class="hero-tile">🍗</div>
-        <div class="hero-tile gold">🌿</div>
+      <div class="hero-visual" id="hero-vis">
+        <div class="hero-frame"></div>
+        <div class="hero-photo">
+          <img src="assets/img/hero.jpg" alt="محصولات پروتئینی تازه پرودید"
+               onerror="document.getElementById('hero-vis').classList.add('no-photo')">
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <span class="ring ring-1"></span>
+          <span class="ring ring-2"></span>
+          <span class="art-main">
+            <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <!-- بشقاب -->
+              <circle cx="60" cy="60" r="44"/>
+              <circle cx="60" cy="60" r="34" opacity=".55"/>
+              <!-- استیک -->
+              <path d="M42 62c0-9 8-15 18-15 11 0 19 5 19 13s-7 15-18 15c-11 0-19-5-19-13Z"/>
+              <path d="M49 61.5c0-4.5 4.5-8 10.5-8 6.5 0 11 2.5 11 7s-4.5 8.5-11 8.5c-6.5 0-10.5-3-10.5-7.5Z" opacity=".7"/>
+              <!-- خطوط گریل -->
+              <path d="m50 52 16 16M58 49l14 14" opacity=".5"/>
+              <!-- شاخه رزماری -->
+              <path d="M78 40c4-6 10-8 16-7M82 37l-2-4M86 34l-1-4M90 33l0-4M94 33l1-4" opacity=".8"/>
+              <!-- چنگال -->
+              <path d="M22 88 40 70M18 76l8 8M22 72l8 8M26 68l8 8" opacity=".9"/>
+              <!-- کارد -->
+              <path d="M98 88 80 70l14-4c4 4 5 8 4 14l-0 8Z" opacity=".9"/>
+            </svg>
+          </span>
+          <span class="art-chip chip-a"><span data-icon="truck"></span> ارسال همان‌روز</span>
+          <span class="art-chip chip-b"><span data-icon="award"></span> کیفیت تضمینی</span>
+          <span class="art-chip chip-c"><span data-icon="flame"></span> آماده طبخ</span>
+        </div>
+        <div class="hero-chip"><span data-icon="pin"></span> خیابان امیرکبیر، روبه‌روی بیمارستان متینی</div>
       </div>
     </div>
   </section>
 
-  <!-- ویژگی‌ها -->
-  <div class="container features-strip">
-    <div class="features-grid">
-      <div class="feature">
-        <span class="f-ico">✅</span>
-        <span>کیفیت تضمینی<small>تازه و دست‌چین هر روز</small></span>
-      </div>
-      <div class="feature">
-        <span class="f-ico">⚡</span>
-        <span>سفارش سریع<small>در کمتر از ۲ دقیقه</small></span>
-      </div>
-      <div class="feature">
-        <span class="f-ico">🛵</span>
-        <span>ارسال همان‌روز<small>در سراسر شهر کاشان</small></span>
-      </div>
-      <div class="feature">
-        <span class="f-ico">🏪</span>
-        <span>فروشگاه حضوری<small>خیابان امیرکبیر، روبه‌روی بیمارستان متینی</small></span>
-      </div>
-    </div>
-  </div>
-
   <!-- دسته‌بندی‌ها -->
   <section class="section container">
-    <div class="section-head">
+    <div class="section-head reveal">
+      <span class="section-eyebrow">چه چیزی میل دارید؟</span>
       <h2 class="section-title">دسته‌بندی محصولات</h2>
-      <a class="section-link" href="pages/shop.html">مشاهده همه ←</a>
     </div>
     <div class="cats-grid" id="home-cats"></div>
   </section>
 
   <!-- پرفروش‌ها -->
   <section class="section container">
-    <div class="section-head">
+    <div class="section-head reveal">
+      <span class="section-eyebrow">انتخاب مشتریان</span>
       <h2 class="section-title">پرفروش‌های پرودید</h2>
-      <a class="section-link" href="pages/shop.html">مشاهده همه ←</a>
+      <div><a class="section-link" href="pages/shop.html">مشاهده همه محصولات <span data-icon="arrow"></span></a></div>
     </div>
     <div class="products-grid" id="home-best"></div>
   </section>
 
   <!-- بنر ارسال -->
   <div class="container">
-    <div class="banner">
+    <div class="banner reveal">
       <div>
-        <h3>🛵 ارسال همان‌روز در کاشان</h3>
+        <h3><span data-icon="truck"></span> ارسال همان‌روز در کاشان</h3>
         <p>سفارش‌های امروز، همان روز درب منزل شما — بازه زمانی تحویل را خودتان انتخاب کنید.</p>
       </div>
-      <a class="btn btn-gold" href="pages/shipping.html">شرایط ارسال</a>
+      <a class="btn btn-primary" href="pages/shipping.html">شرایط ارسال</a>
     </div>
   </div>
 
   <!-- تازه‌ها -->
   <section class="section container">
-    <div class="section-head">
+    <div class="section-head reveal">
+      <span class="section-eyebrow">هر روز، تازه</span>
       <h2 class="section-title">تازه‌های امروز</h2>
-      <a class="section-link" href="pages/shop.html?cat=veg">مشاهده همه ←</a>
     </div>
     <div class="products-grid" id="home-fresh"></div>
   </section>
 
   <!-- اعتمادسازی -->
   <section class="section container">
-    <div class="section-head"><h2 class="section-title">چرا پرودید؟</h2></div>
-    <div class="trust-card">
+    <div class="section-head reveal">
+      <span class="section-eyebrow">با خیال راحت خرید کنید</span>
+      <h2 class="section-title">چرا پرودید؟</h2>
+    </div>
+    <div class="trust-card reveal">
       <div class="trust-item">
-        <span class="t-ico">📍</span>
+        <span class="t-ico"><span data-icon="store"></span></span>
         <div><b>فروشگاه حضوری در کاشان</b>
         <span>خیابان امیرکبیر، روبه‌روی بیمارستان متینی</span></div>
       </div>
       <div class="trust-item">
-        <span class="t-ico">📞</span>
+        <span class="t-ico"><span data-icon="headset"></span></span>
         <div><b>پاسخگویی سریع</b>
-        <span class="num">۰۹۱۳۰۶۱۲۰۱۹</span></div>
+        <a href="tel:09130612019" class="num">۰۹۱۳۰۶۱۲۰۱۹</a></div>
       </div>
       <div class="trust-item">
-        <span class="t-ico">📷</span>
+        <span class="t-ico"><span data-icon="instagram"></span></span>
         <div><b>ما را دنبال کنید</b>
-        <span><a href="https://www.instagram.com/prodid1/" target="_blank" rel="noopener">اینستاگرام PRODID1@</a></span></div>
+        <a href="https://www.instagram.com/prodid1/" target="_blank" rel="noopener">اینستاگرام PRODID1@</a></div>
       </div>
     </div>
   </section>
 
+  <!-- نوار ویژگی‌ها -->
+  <div class="features-band">
+    <div class="container">
+      <div class="features-grid">
+        <div class="feature">
+          <span class="f-ico"><span data-icon="award"></span></span>
+          <span>کیفیت تضمینی<small>محصولات انتخاب‌شده و تازه</small></span>
+        </div>
+        <div class="feature">
+          <span class="f-ico"><span data-icon="truck"></span></span>
+          <span>ارسال سریع<small>همان‌روز در شهر کاشان</small></span>
+        </div>
+        <div class="feature">
+          <span class="f-ico"><span data-icon="snowflake"></span></span>
+          <span>بسته‌بندی بهداشتی<small>حفظ تازگی و کیفیت</small></span>
+        </div>
+        <div class="feature">
+          <span class="f-ico"><span data-icon="leaf"></span></span>
+          <span>۱۰۰٪ طبیعی<small>بدون مواد نگهدارنده</small></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="assets/js/data.js"></script>
+  <script src="assets/js/icons.js"></script>
   <script src="assets/js/app.js"></script>
 </body>
 </html>
