@@ -512,7 +512,7 @@ function initProductPage() {
         <div class="p-meta">
           ${p.badge ? `<span class="badge badge-gold">${p.badge}</span>` : ""}
           ${saleBadge(p)}
-          <span class="badge" style="background:var(--gold-tint);color:var(--gold-deep)">${cat.name}</span>
+          <span class="badge" style="background:var(--wine-tint);color:var(--wine)">${cat.name}</span>
         </div>
         <h1>${p.name}</h1>
         <p class="product-desc">${p.desc}</p>
