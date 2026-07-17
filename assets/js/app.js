@@ -1,0 +1,847 @@
+/* =========================================================
+   پرودید — منطق اصلی سایت
+   سبد خرید در localStorage نگهداری می‌شود و ثبت سفارش از
+   طریق واتس‌اپ / تماس انجام می‌شود (بدون نیاز به سرور).
+   ========================================================= */
+
+const faNum = new Intl.NumberFormat("fa-IR");
+const fmtPrice = (n) => faNum.format(n);
+const toFa = (s) => String(s).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
+
+const getProduct = (id) => PRODUCTS.find((p) => p.id === id);
+const getCategory = (id) => CATEGORIES.find((c) => c.id === id);
+const qs = (sel, el = document) => el.querySelector(sel);
+const qsa = (sel, el = document) => [...el.querySelectorAll(sel)];
+
+/* مسیر پایه برای صفحات داخل پوشه pages */
+const IS_SUB = location.pathname.includes("/pages/");
+const ROOT = IS_SUB ? "../" : "";
+const PAGE = (name) => (name === "index" ? `${ROOT}index.html` : `${ROOT}pages/${name}.html`);
+
+/* ---------------- سبد خرید ---------------- */
+const CART_KEY = "prodid_cart";
+const Cart = {
+  read() {
+    try { return JSON.parse(localStorage.getItem(CART_KEY)) || {}; }
+    catch { return {}; }
+  },
+  write(c) {
+    localStorage.setItem(CART_KEY, JSON.stringify(c));
+    updateCartBadges();
+  },
+  qty(id) { return this.read()[id] || 0; },
+  step(p) { return p.sale === "w" ? 0.5 : 1; },
+  minQty(p) { return p.sale === "w" ? 0.5 : 1; },
+  add(id, amount) {
+    const p = getProduct(id);
+    if (!p || !p.available || p.price === null) return;
+    const c = this.read();
+    c[id] = Math.round(((c[id] || 0) + (amount ?? this.minQty(p))) * 100) / 100;
+    if (c[id] <= 0) delete c[id];
+    this.write(c);
+  },
+  set(id, qty) {
+    const c = this.read();
+    if (qty <= 0) delete c[id];
+    else c[id] = Math.round(qty * 100) / 100;
+    this.write(c);
+  },
+  remove(id) { this.set(id, 0); },
+  clear() { this.write({}); },
+  count() { return Object.keys(this.read()).length; },
+  items() {
+    return Object.entries(this.read())
+      .map(([id, qty]) => ({ p: getProduct(id), qty }))
+      .filter((it) => it.p);
+  },
+  total() {
+    return this.items().reduce((sum, { p, qty }) => sum + (p.price || 0) * qty, 0);
+  },
+  hasWeightItems() { return this.items().some(({ p }) => p.sale === "w"); },
+};
+
+/* واحد نمایش تعداد */
+function qtyLabel(p, qty) {
+  return p.sale === "w" ? `${faNum.format(qty)} کیلوگرم` : `${faNum.format(qty)} بسته`;
+}
+function unitLabel(p) {
+  if (p.price === null) return "";
+  return p.sale === "w" ? "تومان / هر کیلو" : "تومان";
+}
+
+/* ---------------- toast ---------------- */
+let toastTimer;
+function toast(msg) {
+  let el = qs(".toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+/* ---------------- هدر / فوتر / منوی پایین ---------------- */
+const NAV_LINKS = [
+  { id: "index",    label: "صفحه اصلی" },
+  { id: "shop",     label: "فروشگاه" },
+  { id: "shipping", label: "ارسال و سفارش" },
+  { id: "about",    label: "درباره ما" },
+  { id: "contact",  label: "تماس با ما" },
+  { id: "faq",      label: "سوالات متداول" },
+  { id: "account",  label: "حساب کاربری" },
+];
+
+function currentPage() {
+  return document.body.dataset.page || "index";
+}
+
+function renderHeader() {
+  const page = currentPage();
+  const header = document.createElement("header");
+  header.className = "site-header";
+  header.innerHTML = `
+    <div class="container header-inner">
+      <a class="logo" href="${PAGE("index")}" aria-label="پرودید">
+        <span class="logo-badge">🥩</span>
+        <span class="logo-text">
+          <span class="logo-name">پرودید</span><br>
+          <span class="logo-slogan">${BRAND.slogan}</span>
+        </span>
+      </a>
+      <form class="header-search" id="search-desktop" role="search">
+        <input type="search" name="q" placeholder="جست‌وجوی محصول؛ مثلا کباب، ژامبون…" aria-label="جست‌وجو">
+        <span class="search-ico">🔍</span>
+      </form>
+      <div class="header-actions">
+        <a class="icon-btn" href="tel:${BRAND.phone}" title="تماس با فروشگاه">📞</a>
+        <a class="icon-btn" href="${PAGE("account")}" title="حساب کاربری">👤</a>
+        <a class="icon-btn" href="${PAGE("cart")}" title="سبد خرید">🛒<span class="cart-badge" data-cart-badge></span></a>
+      </div>
+    </div>
+    <nav class="main-nav" aria-label="منوی اصلی">
+      <div class="container">
+        <ul>
+          ${NAV_LINKS.map((l) => `<li><a href="${PAGE(l.id)}" class="${page === l.id ? "active" : ""}">${l.label}</a></li>`).join("")}
+        </ul>
+      </div>
+    </nav>
+    <div class="mobile-search">
+      <form class="header-search" id="search-mobile" role="search">
+        <input type="search" name="q" placeholder="جست‌وجوی محصول؛ مثلا کباب، ژامبون…" aria-label="جست‌وجو">
+        <span class="search-ico">🔍</span>
+      </form>
+    </div>`;
+  document.body.prepend(header);
+
+  qsa(".header-search", header).forEach((form) => {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const q = form.q.value.trim();
+      location.href = `${PAGE("shop")}${q ? `?q=${encodeURIComponent(q)}` : ""}`;
+    });
+  });
+}
+
+function renderBottomNav() {
+  const page = currentPage();
+  const nav = document.createElement("nav");
+  nav.className = "bottom-nav";
+  nav.setAttribute("aria-label", "منوی موبایل");
+  const items = [
+    { id: "index", label: "خانه", ico: "🏠" },
+    { id: "shop", label: "فروشگاه", ico: "🛍️" },
+    { id: "cart", label: "سبد خرید", ico: "🛒", badge: true },
+    { id: "account", label: "حساب", ico: "👤" },
+  ];
+  nav.innerHTML = items
+    .map((it) => `
+      <a href="${PAGE(it.id)}" class="${page === it.id ? "active" : ""}">
+        <span class="bn-ico">${it.ico}</span>${it.label}
+        ${it.badge ? '<span class="cart-badge" data-cart-badge></span>' : ""}
+      </a>`)
+    .join("");
+  document.body.appendChild(nav);
+}
+
+function renderFooter() {
+  const footer = document.createElement("footer");
+  footer.className = "site-footer";
+  footer.innerHTML = `
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h4>پرودید | ${BRAND.slogan}</h4>
+          <p class="footer-about">
+            فروشگاه تخصصی مواد پروتئینی و فودشاپ در ${BRAND.city}؛ گوشت و استیک تازه،
+            محصولات کبابی و مزه‌دار، سوسیس و کالباس، برگر خانگی و سبزیجات نیمه‌آماده —
+            با ارسال سریع در سطح شهر ${BRAND.city}.
+          </p>
+        </div>
+        <div>
+          <h4>دسترسی سریع</h4>
+          <ul>
+            ${NAV_LINKS.map((l) => `<li><a href="${PAGE(l.id)}">${l.label}</a></li>`).join("")}
+            <li><a href="${PAGE("terms")}">قوانین و مقررات</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>تماس با ما</h4>
+          <div class="footer-contact-line">📍 <span>${BRAND.address}</span></div>
+          <div class="footer-contact-line">📞 <a href="tel:${BRAND.phone}" class="num">${toFa(BRAND.phone)}</a></div>
+          <div class="footer-contact-line">📷 <a href="${BRAND.instagramUrl}" target="_blank" rel="noopener">اینستاگرام ${BRAND.instagram}@</a></div>
+          <div class="footer-contact-line">💬 <a href="https://wa.me/${BRAND.phoneIntl}" target="_blank" rel="noopener">سفارش در واتس‌اپ</a></div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        © ${toFa(new Date().toLocaleDateString("fa-IR", { year: "numeric" }))} پرودید — تمامی حقوق محفوظ است.
+      </div>
+    </div>`;
+  document.body.appendChild(footer);
+}
+
+function updateCartBadges() {
+  const n = Cart.count();
+  qsa("[data-cart-badge]").forEach((b) => { b.textContent = n ? faNum.format(n) : ""; });
+}
+
+/* ---------------- کارت محصول ---------------- */
+function productImg(p, cls = "p-img") {
+  // اگر عکس واقعی در assets/img/products/<id>.jpg موجود باشد نمایش داده می‌شود،
+  // در غیر این صورت آیکن دسته‌بندی نشان داده می‌شود.
+  return `
+    <div class="${cls}">
+      <span class="p-emoji">${p.emoji}</span>
+      <img src="${ROOT}assets/img/products/${p.id}.jpg" alt="${p.name}" loading="lazy"
+           onerror="this.remove()">
+    </div>`;
+}
+
+function saleBadge(p) {
+  if (!p.available) return '<span class="badge badge-out">ناموجود</span>';
+  return p.sale === "w"
+    ? '<span class="badge badge-weight">وزنی</span>'
+    : '<span class="badge badge-unit">عددی</span>';
+}
+
+function priceHTML(p) {
+  if (p.price === null) return '<span class="p-price-call">استعلام قیمت ☎️</span>';
+  return `<span class="p-price">${fmtPrice(p.price)}</span>
+          <span class="p-price-unit">${unitLabel(p)}</span>`;
+}
+
+function cardActionHTML(p) {
+  if (!p.available) return '<button class="p-add out" disabled>ناموجود</button>';
+  if (p.price === null)
+    return `<a class="p-add" href="tel:${BRAND.phone}">📞 تماس برای سفارش</a>`;
+  const inCart = Cart.qty(p.id);
+  if (inCart > 0) return stepperHTML(p, inCart);
+  return `<button class="p-add" data-add="${p.id}">🛒 افزودن به سبد</button>`;
+}
+
+function stepperHTML(p, qty) {
+  return `
+    <div class="p-stepper" data-stepper="${p.id}">
+      <button type="button" data-inc="${p.id}" aria-label="افزایش">＋</button>
+      <span class="st-val">${qtyLabel(p, qty)}</span>
+      <button type="button" data-dec="${p.id}" aria-label="کاهش">－</button>
+    </div>`;
+}
+
+function productCard(p) {
+  return `
+    <article class="p-card" data-card="${p.id}">
+      <a href="${PAGE("product")}?id=${p.id}" aria-label="${p.name}">
+        <div class="p-badges">
+          ${p.badge ? `<span class="badge badge-gold">${p.badge}</span>` : ""}
+          ${saleBadge(p)}
+        </div>
+        ${productImg(p)}
+      </a>
+      <div class="p-body">
+        <a href="${PAGE("product")}?id=${p.id}"><h3 class="p-name">${p.name}</h3></a>
+        <div class="p-price-row">${priceHTML(p)}</div>
+        <div class="card-action">${cardActionHTML(p)}</div>
+      </div>
+    </article>`;
+}
+
+/* رویدادهای افزودن/کم‌کردن که روی کل صفحه گوش می‌دهیم */
+function bindCartEvents(afterChange) {
+  document.addEventListener("click", (e) => {
+    const addBtn = e.target.closest("[data-add]");
+    const incBtn = e.target.closest("[data-inc]");
+    const decBtn = e.target.closest("[data-dec]");
+    if (!addBtn && !incBtn && !decBtn) return;
+    e.preventDefault();
+
+    if (addBtn) {
+      const p = getProduct(addBtn.dataset.add);
+      Cart.add(p.id);
+      toast(`«${p.name}» به سبد اضافه شد`);
+      refreshCardAction(p.id);
+    } else if (incBtn) {
+      const p = getProduct(incBtn.dataset.inc);
+      Cart.add(p.id, Cart.step(p));
+      refreshCardAction(p.id);
+    } else if (decBtn) {
+      const p = getProduct(decBtn.dataset.dec);
+      Cart.add(p.id, -Cart.step(p));
+      refreshCardAction(p.id);
+    }
+    if (afterChange) afterChange();
+  });
+}
+
+function refreshCardAction(id) {
+  const p = getProduct(id);
+  qsa(`[data-card="${id}"] .card-action`).forEach((el) => {
+    el.innerHTML = cardActionHTML(p);
+  });
+}
+
+/* ---------------- پروفایل کاربر (localStorage) ---------------- */
+const PROFILE_KEY = "prodid_profile";
+const ORDERS_KEY = "prodid_orders";
+const Profile = {
+  read() {
+    try { return JSON.parse(localStorage.getItem(PROFILE_KEY)) || {}; }
+    catch { return {}; }
+  },
+  write(p) { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); },
+};
+const Orders = {
+  read() {
+    try { return JSON.parse(localStorage.getItem(ORDERS_KEY)) || []; }
+    catch { return []; }
+  },
+  add(order) {
+    const list = Orders.read();
+    list.unshift(order);
+    localStorage.setItem(ORDERS_KEY, JSON.stringify(list.slice(0, 20)));
+  },
+};
+
+/* ---------------- راه‌اندازی مشترک ---------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  renderHeader();
+  renderBottomNav();
+  renderFooter();
+  updateCartBadges();
+
+  const page = currentPage();
+  const init = {
+    index: initHome,
+    shop: initShop,
+    product: initProductPage,
+    cart: initCartPage,
+    checkout: initCheckoutPage,
+    account: initAccountPage,
+  }[page];
+  if (init) init();
+  else bindCartEvents();
+});
+
+/* =========================================================
+   صفحه اصلی
+   ========================================================= */
+function initHome() {
+  bindCartEvents();
+
+  // دسته‌بندی‌ها
+  qs("#home-cats").innerHTML = CATEGORIES.map((c) => `
+    <a class="cat-card" href="${c.soon ? "#" : `${PAGE("shop")}?cat=${c.id}`}"
+       ${c.soon ? 'onclick="toast(\'این دسته به‌زودی تکمیل می‌شود\');return false;"' : ""}>
+      ${c.soon ? '<span class="soon-tag">به‌زودی</span>' : ""}
+      <span class="c-emoji">${c.emoji}</span>
+      <span class="c-name">${c.name}</span>
+    </a>`).join("");
+
+  // پرفروش‌ها
+  const best = PRODUCTS.filter((p) => p.badge === "پرفروش")
+    .concat(PRODUCTS.filter((p) => p.badge === "ویژه"))
+    .slice(0, 4);
+  qs("#home-best").innerHTML = best.map(productCard).join("");
+
+  // تازه‌های امروز (نمونه: سبزیجات و کبابی)
+  const fresh = PRODUCTS.filter((p) => ["veg", "kebab"].includes(p.cat)).slice(0, 4);
+  qs("#home-fresh").innerHTML = fresh.map(productCard).join("");
+}
+
+/* =========================================================
+   فروشگاه
+   ========================================================= */
+function initShop() {
+  bindCartEvents();
+
+  const params = new URLSearchParams(location.search);
+  const state = {
+    cat: params.get("cat") || "all",
+    q: params.get("q") || "",
+    type: "all",       // all | w | u
+    onlyAvailable: false,
+    sort: "default",   // default | price-asc | price-desc | name
+  };
+
+  // چیپ‌های دسته‌بندی
+  const cats = [{ id: "all", name: "همه", emoji: "" }, ...CATEGORIES.filter((c) => !c.soon)];
+  qs("#shop-chips").innerHTML = cats.map((c) =>
+    `<button class="chip ${state.cat === c.id ? "active" : ""}" data-cat="${c.id}">${c.emoji ? c.emoji + " " : ""}${c.name}</button>`
+  ).join("");
+
+  if (state.q) {
+    qsa(".header-search input").forEach((i) => { i.value = state.q; });
+  }
+
+  function apply() {
+    let list = PRODUCTS.slice();
+    if (state.cat !== "all") list = list.filter((p) => p.cat === state.cat);
+    if (state.q) {
+      const q = state.q.trim();
+      list = list.filter((p) => p.name.includes(q) || (p.desc || "").includes(q));
+    }
+    if (state.type !== "all") list = list.filter((p) => p.sale === state.type);
+    if (state.onlyAvailable) list = list.filter((p) => p.available);
+
+    if (state.sort === "price-asc") list.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+    if (state.sort === "price-desc") list.sort((a, b) => (b.price ?? -1) - (a.price ?? -1));
+    if (state.sort === "name") list.sort((a, b) => a.name.localeCompare(b.name, "fa"));
+
+    qs("#shop-count").textContent = list.length
+      ? `${faNum.format(list.length)} محصول`
+      : "";
+    qs("#shop-grid").innerHTML = list.length
+      ? list.map(productCard).join("")
+      : `<div class="empty-state" style="grid-column:1/-1">
+           <div class="e-ico">🔍</div>
+           <b>محصولی پیدا نشد</b>
+           جست‌وجو یا فیلترها را تغییر دهید.
+         </div>`;
+  }
+
+  qs("#shop-chips").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-cat]");
+    if (!chip) return;
+    state.cat = chip.dataset.cat;
+    qsa("#shop-chips .chip").forEach((c) => c.classList.toggle("active", c === chip));
+    apply();
+  });
+  qs("#f-type").addEventListener("change", (e) => { state.type = e.target.value; apply(); });
+  qs("#f-sort").addEventListener("change", (e) => { state.sort = e.target.value; apply(); });
+  qs("#f-available").addEventListener("change", (e) => { state.onlyAvailable = e.target.checked; apply(); });
+
+  apply();
+}
+
+/* =========================================================
+   صفحه محصول
+   ========================================================= */
+function initProductPage() {
+  bindCartEvents(syncProductQty);
+
+  const id = new URLSearchParams(location.search).get("id");
+  const p = getProduct(id);
+  const wrap = qs("#product-wrap");
+
+  if (!p) {
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <div class="e-ico">😕</div>
+        <b>محصول پیدا نشد</b>
+        <a class="btn btn-green mt-2" href="${PAGE("shop")}">رفتن به فروشگاه</a>
+      </div>`;
+    return;
+  }
+
+  document.title = `${p.name} | پرودید`;
+  const cat = getCategory(p.cat);
+
+  wrap.innerHTML = `
+    <nav class="muted" style="font-size:.8rem" aria-label="مسیر">
+      <a href="${PAGE("index")}">خانه</a> ‹
+      <a href="${PAGE("shop")}">فروشگاه</a> ‹
+      <a href="${PAGE("shop")}?cat=${p.cat}">${cat.name}</a> ‹
+      ${p.name}
+    </nav>
+    <div class="product-layout">
+      ${productImg(p, "product-gallery")}
+      <div class="product-info">
+        <div class="p-meta">
+          ${p.badge ? `<span class="badge badge-gold">${p.badge}</span>` : ""}
+          ${saleBadge(p)}
+          <span class="badge" style="background:var(--green-50);color:var(--green-800)">${cat.emoji} ${cat.name}</span>
+        </div>
+        <h1>${p.name}</h1>
+        <p class="product-desc">${p.desc}</p>
+        <div class="price-box">
+          <div class="p-price-row">${priceHTML(p)}</div>
+          ${p.sale === "w" && p.price !== null ? `
+            <div class="weight-note">⚖️
+              <span>این محصول <b>وزنی</b> است؛ قیمت بالا برای هر کیلوگرم است و
+              مبلغ نهایی سفارش شما پس از وزن‌کشی دقیق مشخص و اطلاع‌رسانی می‌شود.</span>
+            </div>` : ""}
+          ${p.price === null ? `
+            <div class="weight-note">☎️
+              <span>قیمت این محصول روزانه تغییر می‌کند؛ برای استعلام و سفارش با
+              <a href="tel:${BRAND.phone}" class="num"><b>${toFa(BRAND.phone)}</b></a> تماس بگیرید.</span>
+            </div>` : ""}
+        </div>
+        <div id="product-action"></div>
+        <a class="btn btn-outline btn-block mt-1" href="tel:${BRAND.phone}">📞 سوال دارید؟ تماس بگیرید</a>
+      </div>
+    </div>
+    <section class="section">
+      <div class="section-head"><h2 class="section-title">محصولات مرتبط</h2></div>
+      <div class="products-grid">
+        ${PRODUCTS.filter((x) => x.cat === p.cat && x.id !== p.id).slice(0, 4).map(productCard).join("")}
+      </div>
+    </section>`;
+
+  function syncProductQty() {
+    const action = qs("#product-action");
+    if (!p.available) {
+      action.innerHTML = '<button class="btn btn-block" disabled style="background:#eceff1;color:#90a4ae">ناموجود</button>';
+      return;
+    }
+    if (p.price === null) {
+      action.innerHTML = `<a class="btn btn-gold btn-block" href="tel:${BRAND.phone}">📞 تماس برای سفارش</a>`;
+      return;
+    }
+    const inCart = Cart.qty(p.id);
+    if (inCart > 0) {
+      action.innerHTML = `
+        <div class="qty-row">
+          <div class="qty-stepper">
+            <button type="button" data-inc="${p.id}">＋</button>
+            <span class="qty-val">${qtyLabel(p, inCart)}</span>
+            <button type="button" data-dec="${p.id}">－</button>
+          </div>
+          <a class="btn btn-gold" style="flex:1" href="${PAGE("cart")}">مشاهده سبد و ادامه خرید</a>
+        </div>`;
+    } else {
+      action.innerHTML = `<button class="btn btn-gold btn-block" data-add="${p.id}">🛒 افزودن به سبد خرید</button>`;
+    }
+  }
+  syncProductQty();
+}
+
+/* =========================================================
+   سبد خرید
+   ========================================================= */
+function initCartPage() {
+  bindCartEvents(renderCart);
+
+  function renderCart() {
+    const wrap = qs("#cart-wrap");
+    const items = Cart.items();
+
+    if (!items.length) {
+      wrap.innerHTML = `
+        <div class="empty-state">
+          <div class="e-ico">🛒</div>
+          <b>سبد خرید شما خالی است</b>
+          از فروشگاه، محصولات تازه و خوشمزه انتخاب کنید.
+          <div class="mt-2"><a class="btn btn-gold" href="${PAGE("shop")}">رفتن به فروشگاه</a></div>
+        </div>`;
+      return;
+    }
+
+    const total = Cart.total();
+    const underMin = total < BRAND.minOrder;
+
+    wrap.innerHTML = `
+      <div class="cart-layout">
+        <div class="cart-list">
+          ${items.map(({ p, qty }) => `
+            <div class="cart-item" data-card="${p.id}">
+              <a class="ci-img" href="${PAGE("product")}?id=${p.id}">
+                ${p.emoji}
+                <img src="${ROOT}assets/img/products/${p.id}.jpg" alt="" onerror="this.remove()">
+              </a>
+              <div>
+                <a href="${PAGE("product")}?id=${p.id}"><div class="ci-name">${p.name}</div></a>
+                <div class="ci-unit">${p.sale === "w" ? `${fmtPrice(p.price)} تومان / کیلو · وزنی` : `${fmtPrice(p.price)} تومان / بسته`}</div>
+                <div class="ci-price">${fmtPrice(p.price * qty)} تومان${p.sale === "w" ? " (تقریبی)" : ""}</div>
+              </div>
+              <div class="ci-side">
+                ${stepperHTML(p, qty)}
+                <button class="ci-remove" data-remove="${p.id}">حذف ✕</button>
+              </div>
+            </div>`).join("")}
+        </div>
+        <aside class="summary-card">
+          <h3>خلاصه سفارش</h3>
+          <div class="sum-row"><span>تعداد اقلام</span><span>${faNum.format(items.length)}</span></div>
+          <div class="sum-row total"><span>جمع کل${Cart.hasWeightItems() ? " (تقریبی)" : ""}</span><span>${fmtPrice(total)} تومان</span></div>
+          ${Cart.hasWeightItems() ? `
+            <p class="sum-note">⚖️ سبد شما شامل محصولات وزنی است؛ مبلغ نهایی پس از وزن‌کشی دقیق مشخص می‌شود.</p>` : ""}
+          <p class="sum-note">🛵 ${BRAND.deliveryFeeNote}.</p>
+          ${underMin ? `
+            <div class="min-order-warn">حداقل مبلغ سفارش ${fmtPrice(BRAND.minOrder)} تومان است.
+            ${fmtPrice(BRAND.minOrder - total)} تومان دیگر به سبد اضافه کنید.</div>` : ""}
+          <a class="btn btn-gold btn-block ${underMin ? "disabled" : ""}"
+             href="${underMin ? "#" : PAGE("checkout")}"
+             ${underMin ? 'onclick="toast(\'مبلغ سفارش به حداقل نرسیده است\');return false;"' : ""}>
+             ادامه و تسویه حساب ←</a>
+          <a class="btn btn-light btn-block mt-1" href="${PAGE("shop")}">ادامه خرید</a>
+        </aside>
+      </div>`;
+
+    qsa("[data-remove]", wrap).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        Cart.remove(btn.dataset.remove);
+        renderCart();
+      });
+    });
+  }
+  renderCart();
+}
+
+/* =========================================================
+   تسویه حساب
+   ========================================================= */
+function initCheckoutPage() {
+  const wrap = qs("#checkout-wrap");
+
+  if (new URLSearchParams(location.search).get("done") === "1") {
+    wrap.innerHTML = checkoutSuccessHTML();
+    return;
+  }
+
+  const items = Cart.items();
+
+  if (!items.length) {
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <div class="e-ico">🛒</div>
+        <b>سبدی برای تسویه وجود ندارد</b>
+        <div class="mt-2"><a class="btn btn-gold" href="${PAGE("shop")}">رفتن به فروشگاه</a></div>
+      </div>`;
+    return;
+  }
+
+  const profile = Profile.read();
+  const total = Cart.total();
+  const SLOTS = ["۹ تا ۱۲", "۱۲ تا ۱۵", "۱۵ تا ۱۸", "۱۸ تا ۲۱"];
+
+  wrap.innerHTML = `
+    <form id="checkout-form" class="checkout-grid" novalidate>
+      <div>
+        <div class="form-card">
+          <h3><span class="step-num">۱</span> مشخصات گیرنده</h3>
+          <div class="form-grid cols-2">
+            <div>
+              <label for="f-name">نام و نام خانوادگی *</label>
+              <input id="f-name" name="name" required value="${profile.name || ""}" placeholder="مثلا: علی محمدی">
+            </div>
+            <div>
+              <label for="f-phone">شماره موبایل *</label>
+              <input id="f-phone" name="phone" required inputmode="tel" dir="ltr" value="${profile.phone || ""}" placeholder="0913xxxxxxx">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <h3><span class="step-num">۲</span> آدرس تحویل (فقط ${BRAND.city})</h3>
+          <div class="form-grid">
+            <div>
+              <label for="f-address">آدرس دقیق *</label>
+              <textarea id="f-address" name="address" rows="3" required placeholder="محله، خیابان، کوچه، پلاک، واحد">${profile.address || ""}</textarea>
+            </div>
+          </div>
+          <p class="muted mt-1">🛵 ارسال فقط در محدوده شهر ${BRAND.city} انجام می‌شود؛ ${BRAND.deliveryFeeNote}.</p>
+        </div>
+
+        <div class="form-card">
+          <h3><span class="step-num">۳</span> زمان تحویل</h3>
+          <div class="form-grid cols-2 mb-2">
+            <div>
+              <label for="f-day">روز تحویل</label>
+              <select id="f-day" name="day">
+                <option value="امروز (ارسال همان‌روز)">امروز (ارسال همان‌روز)</option>
+                <option value="فردا">فردا</option>
+              </select>
+            </div>
+          </div>
+          <label>بازه زمانی</label>
+          <div class="slot-grid" id="slot-grid">
+            ${SLOTS.map((s, i) => `<button type="button" class="slot ${i === 0 ? "active" : ""}" data-slot="${s}">${s}</button>`).join("")}
+          </div>
+        </div>
+
+        <div class="form-card">
+          <h3><span class="step-num">۴</span> روش پرداخت</h3>
+          <label class="pay-option">
+            <input type="radio" name="pay" value="کارت به کارت" checked>
+            <span><b>کارت به کارت 💳</b>
+            <span>شماره کارت پس از تایید سفارش برای شما ارسال می‌شود.</span></span>
+          </label>
+          <label class="pay-option">
+            <input type="radio" name="pay" value="پرداخت در محل">
+            <span><b>پرداخت در محل تحویل 🏠</b>
+            <span>پرداخت با کارت‌خوان سیار یا نقدی هنگام تحویل.</span></span>
+          </label>
+          <label class="pay-option" style="opacity:.6">
+            <input type="radio" name="pay" value="پرداخت آنلاین" disabled>
+            <span><b>پرداخت آنلاین <span class="soon-chip">به‌زودی</span></b>
+            <span>اتصال به درگاه پرداخت اینترنتی در حال راه‌اندازی است.</span></span>
+          </label>
+        </div>
+
+        <div class="form-card">
+          <h3><span class="step-num">۵</span> توضیحات سفارش (اختیاری)</h3>
+          <textarea name="notes" rows="2" placeholder="مثلا: کوبیده‌ها را سیخ‌شده آماده کنید / گوشت کم‌چرب باشد"></textarea>
+        </div>
+      </div>
+
+      <aside class="summary-card">
+        <h3>خلاصه سفارش</h3>
+        ${items.map(({ p, qty }) => `
+          <div class="sum-row">
+            <span>${p.name} × ${qtyLabel(p, qty)}</span>
+            <span>${fmtPrice(p.price * qty)}</span>
+          </div>`).join("")}
+        <div class="sum-row total"><span>جمع کل${Cart.hasWeightItems() ? " (تقریبی)" : ""}</span><span>${fmtPrice(total)} تومان</span></div>
+        ${Cart.hasWeightItems() ? `<p class="sum-note">⚖️ مبلغ نهایی محصولات وزنی پس از وزن‌کشی مشخص و پیش از ارسال به شما اطلاع داده می‌شود.</p>` : ""}
+        <p class="sum-note">🛵 ${BRAND.deliveryFeeNote}.</p>
+        <button type="submit" class="btn btn-gold btn-block">ثبت نهایی سفارش در واتس‌اپ 💬</button>
+        <a class="btn btn-outline btn-block mt-1" href="tel:${BRAND.phone}">ثبت سفارش با تماس 📞</a>
+        <p class="sum-note text-center">با ثبت سفارش، <a href="${PAGE("terms")}" style="color:var(--green-700)"><b>قوانین فروشگاه</b></a> را می‌پذیرید.</p>
+      </aside>
+    </form>`;
+
+  // انتخاب بازه زمانی
+  let selectedSlot = SLOTS[0];
+  qs("#slot-grid").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-slot]");
+    if (!btn) return;
+    selectedSlot = btn.dataset.slot;
+    qsa("#slot-grid .slot").forEach((s) => s.classList.toggle("active", s === btn));
+  });
+
+  qs("#checkout-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const name = form.name.value.trim();
+    const phone = form.phone.value.trim();
+    const address = form.address.value.trim();
+    if (!name || !phone || !address) {
+      toast("لطفا نام، موبایل و آدرس را کامل کنید");
+      return;
+    }
+    if (!/^0?9\d{9}$/.test(phone.replace(/[^\d]/g, ""))) {
+      toast("شماره موبایل معتبر نیست");
+      return;
+    }
+
+    // ذخیره پروفایل برای خرید بعدی
+    Profile.write({ name, phone, address });
+
+    const day = form.day.value;
+    const pay = form.pay.value;
+    const notes = form.notes.value.trim();
+
+    const lines = [
+      "🥩 *سفارش جدید از سایت پرودید*",
+      "──────────────",
+      ...items.map(({ p, qty }, i) =>
+        `${faNum.format(i + 1)}. ${p.name} — ${qtyLabel(p, qty)} — ${fmtPrice(p.price * qty)} تومان${p.sale === "w" ? " (تقریبی)" : ""}`),
+      "──────────────",
+      `💰 جمع کل${Cart.hasWeightItems() ? " (تقریبی)" : ""}: ${fmtPrice(total)} تومان`,
+      `👤 گیرنده: ${name}`,
+      `📱 موبایل: ${phone}`,
+      `📍 آدرس: ${address}`,
+      `⏰ زمان تحویل: ${day} — ساعت ${selectedSlot}`,
+      `💳 روش پرداخت: ${pay}`,
+      notes ? `📝 توضیحات: ${notes}` : "",
+    ].filter(Boolean);
+
+    Orders.add({
+      date: new Date().toISOString(),
+      items: items.map(({ p, qty }) => ({ id: p.id, name: p.name, qty, price: p.price })),
+      total,
+      day,
+      slot: selectedSlot,
+      pay,
+    });
+
+    const url = `https://wa.me/${BRAND.phoneIntl}?text=${encodeURIComponent(lines.join("\n"))}`;
+    Cart.clear();
+    window.open(url, "_blank");
+    location.href = `${PAGE("checkout")}?done=1`;
+  });
+}
+
+/* نمایش پیام موفقیت بعد از ثبت */
+function checkoutSuccessHTML() {
+  return `
+    <div class="success-box">
+      <div class="s-ico">✅</div>
+      <h2>سفارش شما ثبت شد!</h2>
+      <p>جزئیات سفارش در واتس‌اپ برای فروشگاه ارسال شد. همکاران ما به‌زودی
+      برای تایید نهایی و اعلام مبلغ دقیق (محصولات وزنی) با شما تماس می‌گیرند.</p>
+      <a class="btn btn-gold btn-block" href="${PAGE("shop")}">بازگشت به فروشگاه</a>
+      <a class="btn btn-light btn-block mt-1" href="${PAGE("account")}">مشاهده سفارش‌های من</a>
+    </div>`;
+}
+
+/* =========================================================
+   حساب کاربری
+   ========================================================= */
+function initAccountPage() {
+  const profile = Profile.read();
+  const orders = Orders.read();
+
+  qs("#profile-form").innerHTML = `
+    <div class="form-grid">
+      <div>
+        <label for="a-name">نام و نام خانوادگی</label>
+        <input id="a-name" name="name" value="${profile.name || ""}" placeholder="مثلا: علی محمدی">
+      </div>
+      <div>
+        <label for="a-phone">شماره موبایل</label>
+        <input id="a-phone" name="phone" dir="ltr" inputmode="tel" value="${profile.phone || ""}" placeholder="0913xxxxxxx">
+      </div>
+      <div>
+        <label for="a-address">آدرس پیش‌فرض</label>
+        <textarea id="a-address" name="address" rows="3" placeholder="محله، خیابان، کوچه، پلاک">${profile.address || ""}</textarea>
+      </div>
+      <button type="submit" class="btn btn-green">ذخیره اطلاعات</button>
+    </div>`;
+
+  qs("#profile-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const f = e.target;
+    Profile.write({
+      name: f.name.value.trim(),
+      phone: f.phone.value.trim(),
+      address: f.address.value.trim(),
+    });
+    toast("اطلاعات شما ذخیره شد ✅");
+  });
+
+  const ordersWrap = qs("#orders-wrap");
+  if (!orders.length) {
+    ordersWrap.innerHTML = `
+      <div class="empty-state">
+        <div class="e-ico">📦</div>
+        <b>هنوز سفارشی ثبت نکرده‌اید</b>
+        <div class="mt-2"><a class="btn btn-gold" href="${PAGE("shop")}">اولین سفارش را ثبت کنید</a></div>
+      </div>`;
+    return;
+  }
+  ordersWrap.innerHTML = orders.map((o) => `
+    <div class="order-card">
+      <div class="o-head">
+        <span class="o-total">${fmtPrice(o.total)} تومان</span>
+        <span class="o-date">${new Date(o.date).toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric" })} — ${o.day}، ساعت ${o.slot}</span>
+      </div>
+      <div class="o-items">
+        ${o.items.map((it) => `${it.name} (${it.qty >= 1 || Number.isInteger(it.qty) ? faNum.format(it.qty) : faNum.format(it.qty)})`).join("، ")}
+      </div>
+      <div class="muted" style="font-size:.75rem">پرداخت: ${o.pay}</div>
+    </div>`).join("");
+}

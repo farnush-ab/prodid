@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>فروشگاه | پرودید</title>
+  <meta name="description" content="لیست کامل محصولات پروتئینی پرودید کاشان؛ گوشت، کبابی، کالباس، برگر و سبزیجات نیمه‌آماده.">
+  <link rel="icon" type="image/svg+xml" href="../assets/img/favicon.svg">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="shop">
+
+  <div class="page-head">
+    <div class="container">
+      <h1>🛍️ فروشگاه پرودید</h1>
+      <p>همه محصولات تازه و پروتئینی، آماده سفارش با ارسال همان‌روز در کاشان</p>
+    </div>
+  </div>
+
+  <main class="container">
+    <div class="shop-toolbar">
+      <div class="chips" id="shop-chips" role="tablist" aria-label="دسته‌بندی‌ها"></div>
+      <div class="shop-controls">
+        <select id="f-type" aria-label="نوع فروش">
+          <option value="all">همه انواع</option>
+          <option value="w">وزنی (قیمت هر کیلو)</option>
+          <option value="u">عددی / بسته‌ای</option>
+        </select>
+        <select id="f-sort" aria-label="مرتب‌سازی">
+          <option value="default">مرتب‌سازی پیش‌فرض</option>
+          <option value="price-asc">ارزان‌ترین</option>
+          <option value="price-desc">گران‌ترین</option>
+          <option value="name">حروف الفبا</option>
+        </select>
+        <label class="check"><input type="checkbox" id="f-available"> فقط موجود</label>
+        <span class="results-count" id="shop-count"></span>
+      </div>
+    </div>
+    <div class="products-grid" id="shop-grid"></div>
+  </main>
+
+  <script src="../assets/js/data.js"></script>
+  <script src="../assets/js/app.js"></script>
+</body>
+</html>
