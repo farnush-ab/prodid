@@ -394,7 +394,7 @@ function initHome() {
     <a class="cat-card" href="${c.soon ? "#" : `${PAGE("shop")}?cat=${c.id}`}"
        ${c.soon ? 'onclick="toast(\'این دسته به‌زودی تکمیل می‌شود\');return false;"' : ""}>
       ${c.soon ? '<span class="soon-tag">به‌زودی</span>' : ""}
-      <span class="c-ico">${icon(c.ic)}</span>
+      <span class="c-ico">${icon(c.ic)}<img src="${ROOT}assets/img/categories/${c.id}.jpg" alt="" loading="lazy" onerror="this.remove()"></span>
       <span class="c-name">${c.name}</span>
     </a>`).join("");
   staggerReveal(qs("#home-cats"));
