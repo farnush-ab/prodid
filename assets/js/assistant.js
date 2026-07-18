@@ -20,7 +20,10 @@
   const AVATAR = `${ROOT}assets/img/assistant.png`;
   const WALK_IMG = `${ROOT}assets/img/assistant-walk.png`;
   const WAVE_IMG = `${ROOT}assets/img/assistant-wave.png`;
+  const CYCLE_IMG = `${ROOT}assets/img/assistant-walkcycle.png`;
   const INTRO_MSG = "سلام! من دستیار هوشمند پرودیدم 👋 سوال‌هات درباره محصولات، ارسال یا حتی آشپزی رو از من بپرس!";
+  const GREET_MSG = "هی! من می‌تونم کمکت کنما 😊 هر سوالی داشتی روم کلیک کن.";
+  const PEEK_MSG = "من همین‌جام عزیزم؛ حواسم بهت هست 😉";
   const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ---------------- نرمال‌سازی متن فارسی ---------------- */
@@ -240,68 +243,126 @@
     renderChips(CHIPS);
   }
 
-  /* ---------------- معرفی اولیه: قدم زدن شخصیت ---------------- */
+  /* ---------------- حضورهای شخصیت ---------------- */
   let walker, walkTimers = [];
   const wt = (fn, ms) => walkTimers.push(setTimeout(fn, ms));
 
-  function markIntroSeen() {
-    state.introSeen = true;
-    saveState();
+  // اسپرایت چرخه قدم (اگر موجود باشد راه رفتن واقعی، وگرنه تاب خوردن)
+  let cycleReady = null; // { frames, fw, fh }
+  const cycleProbe = new Image();
+  cycleProbe.onload = () => {
+    const fh = cycleProbe.naturalHeight;
+    const frames = Math.max(1, Math.round(cycleProbe.naturalWidth / fh));
+    cycleReady = { frames, fw: cycleProbe.naturalWidth / frames, fh };
+  };
+  cycleProbe.src = CYCLE_IMG;
+
+  function endMoment(open) {
+    walkTimers.forEach(clearTimeout);
+    walkTimers = [];
+    if (!walker) return;
+    const w = walker;
+    walker = null;
+    w.classList.add("as-walk-out");
+    setTimeout(() => {
+      w.remove();
+      if (open) openPanel();
+      else showFab();
+    }, 450);
   }
 
-  function startWalkIntro() {
+  function spawnMoment(cls, inner) {
+    hideFab();
     walker = document.createElement("div");
-    walker.className = "as-walker";
-    walker.innerHTML = `
+    walker.className = `as-walker ${cls}`;
+    walker.innerHTML = inner;
+    document.body.appendChild(walker);
+    walker.addEventListener("click", () => endMoment(true));
+    return walker;
+  }
+
+  /* بار اول: قدم زدن کامل از چپ به راست */
+  function startWalkIntro() {
+    const el = spawnMoment("", `
       <div class="as-walk-bubble" hidden>
         <b>دستیار هوشمند پرودید</b>
         <span>${INTRO_MSG}</span>
       </div>
-      <img class="as-walk-img" src="${WALK_IMG}" alt="دستیار هوشمند پرودید">`;
-    document.body.appendChild(walker);
+      ${cycleReady
+        ? `<div class="as-cycle" style="--cf:${cycleReady.frames};--cw:${cycleReady.fw};--ch:${cycleReady.fh}"></div>`
+        : `<div class="as-rig" aria-label="دستیار هوشمند پرودید">
+             <img class="as-leg as-leg-l" src="${ROOT}assets/img/assistant-leg-l.png" alt="">
+             <img class="as-leg as-leg-r" src="${ROOT}assets/img/assistant-leg-r.png" alt="">
+             <img class="as-body" src="${ROOT}assets/img/assistant-body.png" alt="">
+           </div>`}`);
 
-    const img = walker.querySelector(".as-walk-img");
-    const bubble = walker.querySelector(".as-walk-bubble");
-    // عرض پوز «دست تکان دادن» پهن‌تر از پوز راه رفتن است؛ بر اساس آن حساب می‌کنیم
+    const bubble = el.querySelector(".as-walk-bubble");
+    const cyc0 = el.querySelector(".as-cycle");
+    if (cyc0) cyc0.style.animationTimingFunction = `steps(${cycleReady.frames})`;
     const imgW = window.innerWidth < 600 ? 100 : 128;
     const endX = window.innerWidth - imgW - 16;
-    const walkMs = Math.min(5200, Math.max(2800, window.innerWidth * 3));
+    const walkMs = Math.min(6000, Math.max(3200, window.innerWidth * 3.4));
 
-    // با کلیک در هر لحظه، مستقیم پنل باز شود
-    walker.addEventListener("click", () => finishWalk(true));
-
-    // قدم زدن از چپ به راست
-    img.classList.add("as-walking");
-    const anim = walker.animate(
-      [{ transform: "translateX(0)" }, { transform: `translateX(${endX + 160}px)` }],
+    const anim = el.animate(
+      [{ transform: "translateX(0)" }, { transform: `translateX(${endX + 170}px)` }],
       { duration: walkMs, easing: "linear", fill: "forwards" }
     );
 
     anim.onfinish = () => {
-      // ایستادن، دست تکان دادن و معرفی
-      img.classList.remove("as-walking");
-      img.src = WAVE_IMG;
-      img.classList.add("as-waving");
+      if (!walker) return;
+      // توقف راه رفتن و تعویض با پوز دست تکان دادن
+      const moving = el.querySelector(".as-cycle") || el.querySelector(".as-rig");
+      if (moving) moving.outerHTML = `<img class="as-walk-img as-waving" src="${WAVE_IMG}" alt="">`;
       bubble.hidden = false;
       requestAnimationFrame(() => bubble.classList.add("in"));
-      wt(() => finishWalk(false), 5200);
+      state.walked = true;
+      saveState();
+      wt(() => endMoment(false), 5200);
     };
+  }
 
-    function finishWalk(open) {
-      walkTimers.forEach(clearTimeout);
-      markIntroSeen();
-      walker.classList.add("as-walk-out");
-      setTimeout(() => {
-        walker.remove();
-        if (open) openPanel();
-        else showFab();
-      }, 450);
-    }
+  /* بازدیدهای بعدی صفحه اصلی: ظاهر شدن سمت راست با دست بالا */
+  function popGreet() {
+    const el = spawnMoment("as-pop", `
+      <div class="as-walk-bubble" hidden>
+        <b>دستیار هوشمند پرودید</b>
+        <span>${GREET_MSG}</span>
+      </div>
+      <img class="as-walk-img as-waving" src="${WAVE_IMG}" alt="دستیار هوشمند پرودید">`);
+    requestAnimationFrame(() => el.classList.add("in"));
+    const bubble = el.querySelector(".as-walk-bubble");
+    wt(() => {
+      if (!walker) return;
+      bubble.hidden = false;
+      requestAnimationFrame(() => bubble.classList.add("in"));
+    }, 700);
+    wt(() => endMoment(false), 5200);
+  }
+
+  /* صفحه محصول: سرک کشیدن از لبه راست */
+  function peekProduct() {
+    const el = spawnMoment("as-peek", `
+      <div class="as-walk-bubble as-peek-bubble" hidden>
+        <span>${PEEK_MSG}</span>
+      </div>
+      <img class="as-peek-img" src="${WAVE_IMG}" alt="دستیار هوشمند پرودید">`);
+    requestAnimationFrame(() => el.classList.add("in"));
+    const bubble = el.querySelector(".as-walk-bubble");
+    wt(() => {
+      if (!walker) return;
+      bubble.hidden = false;
+      requestAnimationFrame(() => bubble.classList.add("in"));
+    }, 650);
+    wt(() => endMoment(false), 4800);
   }
 
   function showFab() {
     fab.hidden = false;
     requestAnimationFrame(() => fab.classList.add("in"));
+  }
+  function hideFab() {
+    fab.classList.remove("in");
+    fab.hidden = true;
   }
 
   /* ---------------- باز/بسته کردن پنل ---------------- */
@@ -419,26 +480,28 @@
   /* ---------------- شروع ---------------- */
   document.addEventListener("DOMContentLoaded", () => {
     build();
+    showFab();
+
+    if (REDUCED) return;
 
     const hero = document.querySelector(".hero");
-    const canWalk = !state.introSeen && !REDUCED && hero && "IntersectionObserver" in window;
-
-    if (!canWalk) {
-      showFab();
-      return;
+    if (hero && "IntersectionObserver" in window) {
+      // صفحه اصلی: هر بار که کاربر هیرو را رد کند، شخصیت ظاهر می‌شود
+      let started = false;
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting && !started) {
+            started = true;
+            io.disconnect();
+            if (state.walked) popGreet();
+            else startWalkIntro();
+          }
+        });
+      }, { threshold: 0 });
+      io.observe(hero);
+    } else if (currentPage() === "product") {
+      // صفحه محصول: بعد از کمی گشت‌وگذار، سرک می‌کشد
+      wt(() => { if (!panel.classList.contains("in")) peekProduct(); }, 5000);
     }
-
-    // وقتی کاربر هیرو را رد کرد، شخصیت وارد صفحه می‌شود
-    let started = false;
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (!e.isIntersecting && !started) {
-          started = true;
-          io.disconnect();
-          startWalkIntro();
-        }
-      });
-    }, { threshold: 0 });
-    io.observe(hero);
   });
 })();
