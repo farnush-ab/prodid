@@ -104,6 +104,34 @@ function observeReveals(root = document) {
   qsa(".reveal:not(.in)", root).forEach((el) => revealObserver.observe(el));
 }
 
+/* ---------------- افکت سه‌بعدی (تیلت با موس) ---------------- */
+function init3D() {
+  if (!matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  const MAX = 7; // حداکثر زاویه چرخش (درجه)
+  document.addEventListener("pointermove", (e) => {
+    const el = e.target.closest?.(".tilt");
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width;
+    const py = (e.clientY - r.top) / r.height;
+    el.style.setProperty("--mx", `${(px * 100).toFixed(1)}%`);
+    el.style.setProperty("--my", `${(py * 100).toFixed(1)}%`);
+    el.style.transition = "transform 0.08s linear";
+    el.style.transform =
+      `perspective(900px) rotateX(${((0.5 - py) * MAX).toFixed(2)}deg)` +
+      ` rotateY(${((px - 0.5) * MAX).toFixed(2)}deg) translateY(-4px)`;
+  });
+  document.addEventListener("pointerout", (e) => {
+    const el = e.target.closest?.(".tilt");
+    if (el && !el.contains(e.relatedTarget)) {
+      el.style.transition = "";
+      el.style.transform = "";
+    }
+  });
+}
+
 /* افزودن reveal پلکانی به فرزندان یک گرید */
 function staggerReveal(container) {
   if (!container) return;
@@ -286,7 +314,7 @@ function stepperHTML(p, qty) {
 
 function productCard(p) {
   return `
-    <article class="p-card" data-card="${p.id}">
+    <article class="p-card tilt" data-card="${p.id}">
       <a href="${PAGE("product")}?id=${p.id}" aria-label="${p.name}">
         <div class="p-badges">
           ${p.badge ? `<span class="badge badge-gold">${p.badge}</span>` : ""}
@@ -381,6 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
   else bindCartEvents();
 
   observeReveals();
+  init3D();
 });
 
 /* =========================================================
@@ -391,10 +420,10 @@ function initHome() {
 
   // دسته‌بندی‌ها
   qs("#home-cats").innerHTML = CATEGORIES.map((c) => `
-    <a class="cat-card" href="${c.soon ? "#" : `${PAGE("shop")}?cat=${c.id}`}"
+    <a class="cat-card tilt" href="${c.soon ? "#" : `${PAGE("shop")}?cat=${c.id}`}"
        ${c.soon ? 'onclick="toast(\'این دسته به‌زودی تکمیل می‌شود\');return false;"' : ""}>
       ${c.soon ? '<span class="soon-tag">به‌زودی</span>' : ""}
-      <span class="c-ico">${icon(c.ic)}<img src="${ROOT}assets/img/categories/${c.id}.jpg" alt="" loading="lazy" onerror="this.remove()"></span>
+      <span class="c-img">${icon(c.ic)}<img src="${ROOT}assets/img/categories/${c.id}.jpg" alt="${c.name}" loading="lazy" onerror="this.remove()"></span>
       <span class="c-name">${c.name}</span>
     </a>`).join("");
   staggerReveal(qs("#home-cats"));

@@ -387,43 +387,57 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 /* ---------- دسته‌بندی‌ها ---------- */
 .cats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 14px;
 }
+@media (min-width: 768px) { .cats-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
 @media (min-width: 768px) { .cats-grid { gap: 18px; } }
 .cat-card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  padding: 22px 10px 18px;
+  padding: 0 0 12px;
   text-align: center;
   transition: border-color 0.3s, transform 0.3s var(--ease), box-shadow 0.3s;
   position: relative;
+  overflow: hidden;
+  display: block;
 }
 .cat-card:hover { border-color: var(--wine-border); transform: translateY(-5px); box-shadow: var(--shadow-lg); }
-.cat-card .c-ico {
-  width: 54px; height: 54px;
-  margin: 0 auto 12px;
-  border-radius: 50%;
+.cat-card .c-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
   background: var(--wine-tint);
-  display: grid; place-items: center;
-  color: var(--wine);
-  transition: background 0.3s, color 0.3s;
   position: relative;
   overflow: hidden;
+  color: var(--wine);
 }
-.cat-card .c-ico img {
+.cat-card .c-img .ico {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 34px; height: 34px;
+}
+.cat-card .c-img img {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: cover;
+  transition: transform 0.45s var(--ease);
 }
-.cat-card .c-ico .ico { width: 25px; height: 25px; }
-.cat-card:hover .c-ico { background: var(--espresso-800); color: var(--wine-light); }
-.cat-card .c-name { font-size: 0.78rem; font-weight: 700; line-height: 1.55; color: var(--espresso-800); }
+.cat-card:hover .c-img img { transform: scale(1.07); }
+.cat-card .c-name {
+  display: block;
+  font-size: 0.78rem; font-weight: 700;
+  line-height: 1.55;
+  color: var(--espresso-800);
+  padding: 10px 8px 2px;
+}
 .cat-card .soon-tag {
   position: absolute; top: 10px; left: 10px;
-  background: #eee9dd; color: #8d8172;
-  font-size: 0.58rem; font-weight: 700;
+  background: rgba(255, 253, 247, 0.92); color: #6d6353;
+  font-size: 0.58rem;
+  z-index: 2; font-weight: 700;
   padding: 2px 9px;
   border-radius: 999px;
 }
@@ -1434,4 +1448,63 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 }
 @media (prefers-reduced-motion: reduce) {
   .as-rig, .as-leg-l, .as-leg-r { animation: none; }
+}
+
+
+/* =========================================================
+   افکت‌های سه‌بعدی
+   ========================================================= */
+.tilt { transform-style: preserve-3d; will-change: transform; }
+/* هاله نور که دنبال موس حرکت می‌کند */
+.tilt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.22), transparent 55%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: 4;
+}
+.tilt:hover::before { opacity: 1; }
+
+/* عمق لایه‌ای کارت‌ها: هایلایت لبه بالا + سایه عمیق‌تر hover */
+.p-card, .cat-card, .trust-card, .content-card, .form-card, .summary-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), var(--shadow);
+}
+.p-card:hover, .cat-card:hover {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 24px 50px rgba(38, 32, 25, 0.18);
+}
+
+/* دکمه اصلی با لبه سه‌بعدی و افکت فشردن */
+.btn-primary {
+  box-shadow: 0 4px 0 #6d1c18, 0 10px 24px rgba(156, 43, 37, 0.3);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 #6d1c18, 0 14px 30px rgba(156, 43, 37, 0.36);
+}
+.btn-primary:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #6d1c18, 0 4px 12px rgba(156, 43, 37, 0.3);
+}
+.p-add { box-shadow: 0 3px 0 #0d0a08; }
+.p-add:active { transform: translateY(2px) !important; box-shadow: 0 1px 0 #0d0a08; }
+
+/* ورود سه‌بعدی المان‌ها هنگام اسکرول */
+.reveal {
+  opacity: 0;
+  transform: perspective(900px) translateY(26px) rotateX(7deg);
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+}
+.reveal.in { opacity: 1; transform: perspective(900px) none; }
+
+/* هیرو: قاب ویدیو با عمق */
+.hero-media.tilt:hover { box-shadow: 0 36px 80px rgba(0, 0, 0, 0.55); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt::before { display: none; }
+  .reveal { transform: none; }
 }
