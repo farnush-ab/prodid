@@ -532,6 +532,46 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 .p-stepper button .ico { width: 15px; height: 15px; }
 .p-stepper .st-val { font-weight: 700; color: var(--espresso-800); font-size: 0.78rem; white-space: nowrap; }
 
+/* استپر وزنی با ورودی گرم */
+.p-stepper.wgt { max-width: 176px; }
+.p-stepper.wgt button { width: 34px; }
+.st-wgt { display: inline-flex; align-items: baseline; gap: 3px; min-width: 0; }
+.st-inp {
+  width: 46px; border: 0; background: transparent; text-align: center;
+  font-family: inherit; font-weight: 800; font-size: 0.82rem;
+  color: var(--espresso-800); padding: 2px 0; border-radius: 6px;
+  border-bottom: 1.5px dashed var(--wine-border);
+}
+.st-inp:focus { outline: none; background: #fff; border-bottom-color: var(--wine); }
+.st-unit { font-size: 0.68rem; font-weight: 700; color: var(--espresso-500, #8b7f6e); }
+.cart-item .p-stepper.wgt { max-width: 168px; }
+
+/* انتخاب‌گر وزن دلخواه در صفحه محصول */
+.qty-stepper.wgt .qty-val { display: inline-flex; align-items: baseline; justify-content: center; gap: 4px; min-width: 96px; }
+.wctl-inp {
+  width: 62px; border: 0; background: transparent; text-align: center;
+  font-family: inherit; font-weight: 900; font-size: 1rem; color: var(--espresso-800);
+  padding: 2px 0; border-radius: 8px; border-bottom: 2px dashed var(--wine-border);
+}
+.wctl-inp:focus { outline: none; background: #fff; border-bottom-color: var(--wine); }
+.wctl-unit { font-size: 0.8rem; font-weight: 700; color: var(--espresso-500, #8b7f6e); }
+.wctl { margin: 18px 0; }
+.wctl-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: var(--espresso-800); margin-bottom: 12px; }
+.wctl-label .ico { width: 18px; height: 18px; color: var(--wine); }
+.wctl-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.wctl-price { font-size: 0.82rem; color: var(--espresso-500, #8b7f6e); line-height: 1.5; }
+.wctl-price b { font-size: 1.15rem; font-weight: 900; color: var(--wine); }
+.wchips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.wchip {
+  padding: 7px 14px; border-radius: 999px; border: 1px solid var(--wine-border);
+  background: var(--wine-tint); color: var(--espresso-800); font-weight: 700;
+  font-size: 0.8rem; cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.wchip:hover { border-color: var(--wine); }
+.wchip.active { background: var(--wine); border-color: var(--wine); color: #fbf6ec; }
+.wctl-hint { display: flex; align-items: flex-start; gap: 6px; margin-top: 14px; font-size: 0.76rem; color: var(--espresso-500, #8b7f6e); line-height: 1.7; }
+.wctl-hint .ico { width: 15px; height: 15px; flex: none; margin-top: 3px; color: var(--wine); }
+
 /* ---------- نوار ویژگی‌ها ---------- */
 .features-band {
   border-block: 1px solid var(--line);

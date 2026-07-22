@@ -7,6 +7,15 @@
 const faNum = new Intl.NumberFormat("fa-IR");
 const fmtPrice = (n) => faNum.format(n);
 const toFa = (s) => String(s).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
+/* تبدیل ارقام فارسی/عربی به انگلیسی و استخراج عدد صحیح */
+function parseIntFa(s) {
+  const norm = String(s)
+    .replace(/[۰-۹]/g, (d) => "۰۱۲۳۴۵۶۷۸۹".indexOf(d))
+    .replace(/[٠-٩]/g, (d) => "٠١٢٣٤٥٦٧٨٩".indexOf(d))
+    .replace(/[^\d]/g, "");
+  const n = parseInt(norm, 10);
+  return Number.isFinite(n) ? n : 0;
+}
 
 const getProduct = (id) => PRODUCTS.find((p) => p.id === id);
 const getCategory = (id) => CATEGORIES.find((c) => c.id === id);
@@ -30,21 +39,27 @@ const Cart = {
     updateCartBadges();
   },
   qty(id) { return this.read()[id] || 0; },
-  step(p) { return p.sale === "w" ? 0.5 : 1; },
-  minQty(p) { return p.sale === "w" ? 0.5 : 1; },
+  MIN_WEIGHT: 0.1,                       // حداقل وزن سفارش: ۱۰۰ گرم
+  step(p) { return p.sale === "w" ? 0.1 : 1; },      // گام دکمه‌های +/− : ۱۰۰ گرم
+  defaultAdd(p) { return p.sale === "w" ? 0.5 : 1; }, // مقدار پیش‌فرض افزودن اولیه: ۵۰۰ گرم
   add(id, amount) {
     const p = getProduct(id);
     if (!p || !p.available || p.price === null) return;
     const c = this.read();
-    c[id] = Math.round(((c[id] || 0) + (amount ?? this.minQty(p))) * 100) / 100;
+    c[id] = Math.round(((c[id] || 0) + (amount ?? this.defaultAdd(p))) * 1000) / 1000;
     if (c[id] <= 0) delete c[id];
     this.write(c);
   },
   set(id, qty) {
     const c = this.read();
     if (qty <= 0) delete c[id];
-    else c[id] = Math.round(qty * 100) / 100;
+    else c[id] = Math.round(qty * 1000) / 1000;
     this.write(c);
+  },
+  /* تعیین وزن دقیق بر حسب گرم (با اعمال حداقل ۱۰۰ گرم) */
+  setGrams(id, grams) {
+    const kg = Math.max(this.MIN_WEIGHT, grams / 1000);
+    this.set(id, Math.round(kg * 1000) / 1000);
   },
   remove(id) { this.set(id, 0); },
   clear() { this.write({}); },
@@ -62,7 +77,9 @@ const Cart = {
 
 /* واحد نمایش تعداد */
 function qtyLabel(p, qty) {
-  return p.sale === "w" ? `${faNum.format(qty)} کیلوگرم` : `${faNum.format(qty)} بسته`;
+  if (p.sale !== "w") return `${faNum.format(qty)} بسته`;
+  const g = Math.round(qty * 1000);
+  return g >= 1000 ? `${faNum.format(g / 1000)} کیلوگرم` : `${faNum.format(g)} گرم`;
 }
 function unitLabel(p) {
   if (p.price === null) return "";
@@ -304,6 +321,18 @@ function cardActionHTML(p) {
 }
 
 function stepperHTML(p, qty) {
+  if (p.sale === "w") {
+    return `
+    <div class="p-stepper wgt" data-stepper="${p.id}">
+      <button type="button" data-inc="${p.id}" aria-label="افزایش ۱۰۰ گرم">${icon("plus")}</button>
+      <span class="st-wgt">
+        <input class="st-inp" data-wgt="${p.id}" type="text" inputmode="numeric"
+               value="${toFa(Math.round(qty * 1000))}" aria-label="وزن به گرم">
+        <span class="st-unit">گرم</span>
+      </span>
+      <button type="button" data-dec="${p.id}" aria-label="کاهش ۱۰۰ گرم">${icon("minus")}</button>
+    </div>`;
+  }
   return `
     <div class="p-stepper" data-stepper="${p.id}">
       <button type="button" data-inc="${p.id}" aria-label="افزایش">${icon("plus")}</button>
@@ -355,6 +384,17 @@ function bindCartEvents(afterChange) {
       Cart.add(p.id, -Cart.step(p));
       refreshCardAction(p.id);
     }
+    if (afterChange) afterChange();
+  });
+
+  // ورود وزن دلخواه (گرم) در استپرهای وزنی داخل کارت و سبد
+  document.addEventListener("change", (e) => {
+    const inp = e.target.closest("[data-wgt]");
+    if (!inp) return;
+    const p = getProduct(inp.dataset.wgt);
+    if (!p) return;
+    Cart.setGrams(p.id, parseIntFa(inp.value));
+    refreshCardAction(p.id);
     if (afterChange) afterChange();
   });
 }
@@ -581,6 +621,11 @@ function initProductPage() {
       action.innerHTML = `<a class="btn btn-primary btn-block" href="tel:${BRAND.phone}">${icon("phone")} تماس برای سفارش</a>`;
       return;
     }
+    if (p.sale === "w") {
+      action.innerHTML = weightControlHTML(p);
+      bindWeightControl(p, action, syncProductQty);
+      return;
+    }
     const inCart = Cart.qty(p.id);
     if (inCart > 0) {
       action.innerHTML = `
@@ -597,6 +642,83 @@ function initProductPage() {
     }
   }
   syncProductQty();
+}
+
+/* انتخاب‌گر وزن دلخواه در صفحه محصول (محصولات وزنی) */
+const WEIGHT_CHIPS = [250, 500, 750, 1000, 1500];
+function weightControlHTML(p) {
+  const inCart = Cart.qty(p.id);
+  const grams = inCart > 0 ? Math.round(inCart * 1000) : 500;
+  const inCartNow = inCart > 0;
+  return `
+    <div class="wctl" data-wctl="${p.id}">
+      <span class="wctl-label">${icon("scale")} وزن دلخواه خود را وارد کنید</span>
+      <div class="wctl-row">
+        <div class="qty-stepper wgt">
+          <button type="button" data-winc aria-label="افزایش ۱۰۰ گرم">${icon("plus")}</button>
+          <span class="qty-val">
+            <input class="wctl-inp" data-wgt-inp type="text" inputmode="numeric"
+                   value="${toFa(grams)}" aria-label="وزن به گرم">
+            <span class="wctl-unit">گرم</span>
+          </span>
+          <button type="button" data-wdec aria-label="کاهش ۱۰۰ گرم">${icon("minus")}</button>
+        </div>
+        <div class="wctl-price">
+          قیمت تقریبی<br>
+          <b data-wprice>${fmtPrice(Math.round(p.price * grams / 1000))}</b> تومان
+        </div>
+      </div>
+      <div class="wchips">
+        ${WEIGHT_CHIPS.map((g) =>
+          `<button type="button" class="wchip${g === grams ? " active" : ""}" data-wchip="${g}">${
+            g >= 1000 ? `${toFa(g / 1000)} کیلو` : `${toFa(g)} گرم`
+          }</button>`).join("")}
+      </div>
+      ${inCartNow
+        ? `<a class="btn btn-primary btn-block" href="${PAGE("cart")}">${icon("cart")} مشاهده سبد و ادامه خرید</a>`
+        : `<button type="button" class="btn btn-primary btn-block" data-wadd>${icon("cart")} افزودن به سبد خرید</button>`}
+      <p class="wctl-hint">${icon("scale")} حداقل سفارش ۱۰۰ گرم؛ مبلغ نهایی پس از وزن‌کشی دقیق مشخص و اطلاع‌رسانی می‌شود.</p>
+    </div>`;
+}
+
+function bindWeightControl(p, root, rerender) {
+  const box = qs("[data-wctl]", root);
+  if (!box) return;
+  const input = qs("[data-wgt-inp]", box);
+  const priceEl = qs("[data-wprice]", box);
+  const STEP = 100;
+  const MIN = Math.round(Cart.MIN_WEIGHT * 1000);
+  let grams = parseIntFa(input.value) || 500;
+
+  const clamp = (g) => Math.max(MIN, Math.round(g / 10) * 10); // دقت ۱۰ گرمی
+  const paint = () => {
+    input.value = toFa(grams);
+    priceEl.textContent = fmtPrice(Math.round((p.price * grams) / 1000));
+    qsa("[data-wchip]", box).forEach((c) =>
+      c.classList.toggle("active", Number(c.dataset.wchip) === grams));
+    if (Cart.qty(p.id) > 0) Cart.setGrams(p.id, grams); // پس از افزودن، سبد را همگام نگه دار
+  };
+
+  qs("[data-winc]", box).addEventListener("click", () => { grams = clamp(grams + STEP); paint(); });
+  qs("[data-wdec]", box).addEventListener("click", () => { grams = clamp(grams - STEP); paint(); });
+  qsa("[data-wchip]", box).forEach((c) =>
+    c.addEventListener("click", () => { grams = Number(c.dataset.wchip); paint(); }));
+
+  input.addEventListener("input", () => {
+    const g = parseIntFa(input.value);
+    if (g) { grams = g; priceEl.textContent = fmtPrice(Math.round((p.price * grams) / 1000)); }
+  });
+  input.addEventListener("change", () => { grams = clamp(parseIntFa(input.value) || MIN); paint(); });
+
+  const addBtn = qs("[data-wadd]", box);
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      grams = clamp(grams);
+      Cart.setGrams(p.id, grams);
+      toast(`«${p.name}» (${qtyLabel(p, grams / 1000)}) به سبد اضافه شد`);
+      if (rerender) rerender();
+    });
+  }
 }
 
 /* =========================================================
