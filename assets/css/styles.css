@@ -1548,3 +1548,40 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   .tilt::before { display: none; }
   .reveal { transform: none; }
 }
+
+/* ---------- اطلاعیه خاموش‌کردن VPN ---------- */
+.vpn-overlay {
+  position: fixed; inset: 0; z-index: 4000;
+  display: grid; place-items: center; padding: 20px;
+  background: rgba(40, 24, 20, 0.55);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  opacity: 0; transition: opacity 0.3s var(--ease);
+}
+.vpn-overlay.show { opacity: 1; }
+.vpn-card {
+  position: relative; width: 100%; max-width: 380px;
+  background: var(--surface, #fffdf8); color: var(--espresso-800);
+  border: 1px solid var(--line, #eadfce);
+  border-radius: 22px; padding: 34px 26px 26px;
+  text-align: center; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.35);
+  transform: translateY(16px) scale(0.97);
+  transition: transform 0.35s var(--ease);
+}
+.vpn-overlay.show .vpn-card { transform: none; }
+.vpn-close {
+  position: absolute; top: 12px; left: 12px;
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: 50%; color: var(--espresso-500, #8b7f6e);
+  background: var(--wine-tint); transition: background 0.2s, color 0.2s;
+}
+.vpn-close:hover { background: var(--wine); color: #fbf6ec; }
+.vpn-close .ico { width: 18px; height: 18px; }
+.vpn-ico {
+  display: inline-grid; place-items: center;
+  width: 62px; height: 62px; margin-bottom: 14px;
+  border-radius: 50%; background: var(--wine-tint); color: var(--wine);
+}
+.vpn-ico .ico { width: 30px; height: 30px; }
+.vpn-card h3 { font-size: 1.15rem; font-weight: 900; margin-bottom: 10px; }
+.vpn-card p { font-size: 0.9rem; line-height: 1.9; color: var(--espresso-500, #6f6456); margin-bottom: 20px; }
+.vpn-ok { justify-content: center; }

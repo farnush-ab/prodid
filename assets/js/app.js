@@ -450,7 +450,45 @@ document.addEventListener("DOMContentLoaded", () => {
 
   observeReveals();
   init3D();
+  showVpnNotice();
 });
+
+/* ---------------- اطلاعیه خاموش‌کردن VPN ---------------- */
+const VPN_NOTICE_KEY = "prodid_vpn_notice";
+function showVpnNotice() {
+  // فقط یک‌بار در هر نشست (session) نمایش داده می‌شود
+  try { if (sessionStorage.getItem(VPN_NOTICE_KEY)) return; } catch { /* noop */ }
+
+  const overlay = document.createElement("div");
+  overlay.className = "vpn-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "vpn-title");
+  overlay.innerHTML = `
+    <div class="vpn-card" role="document">
+      <button type="button" class="vpn-close" aria-label="بستن">${icon("close")}</button>
+      <span class="vpn-ico">${icon("wifi")}</span>
+      <h3 id="vpn-title">لطفاً VPN خود را خاموش کنید</h3>
+      <p>برای تجربه‌ای روان‌تر و بارگذاری سریع‌تر سایت، پیشنهاد می‌کنیم
+      فیلترشکن (VPN) خود را موقتاً خاموش کنید.</p>
+      <button type="button" class="btn btn-primary btn-block vpn-ok">${icon("check")} متوجه شدم</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add("show"));
+
+  function close() {
+    try { sessionStorage.setItem(VPN_NOTICE_KEY, "1"); } catch { /* noop */ }
+    overlay.classList.remove("show");
+    overlay.addEventListener("transitionend", () => overlay.remove(), { once: true });
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(e) { if (e.key === "Escape") close(); }
+
+  overlay.querySelector(".vpn-close").addEventListener("click", close);
+  overlay.querySelector(".vpn-ok").addEventListener("click", close);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  document.addEventListener("keydown", onKey);
+}
 
 /* =========================================================
    صفحه اصلی

@@ -50,6 +50,8 @@ const ICONS = {
   milk: '<path d="M9 3.5h6M9.5 3.5v3L7 11v8.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5V11l-2.5-4.5v-3"/><path d="M7 14.5h10"/>',
   basket: '<path d="M4 10h16l-1.5 9.5a1.8 1.8 0 0 1-1.8 1.5H7.3a1.8 1.8 0 0 1-1.8-1.5L4 10Z"/><path d="m8 10 3-6M16 10l-3-6M9.5 13.5v4M14.5 13.5v4"/>',
   falafel: '<circle cx="8" cy="9" r="3.2"/><circle cx="16" cy="9" r="3.2"/><circle cx="12" cy="15.5" r="3.2"/>',
+  wifi: '<path d="M2.5 8.5a15 15 0 0 1 19 0"/><path d="M5.5 12a11 11 0 0 1 13 0"/><path d="M8.5 15.5a6 6 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
+  shield: '<path d="M12 3.5 19 6v5c0 4.5-3 8-7 9.5C8 19 5 15.5 5 11V6l7-2.5Z"/><path d="m9 11.5 2 2 4-4"/>',
 };
 
 function icon(name, cls = "") {
