@@ -27,12 +27,14 @@
   --on-dark: #efe7d8;
   --on-dark-2: #b0a595;
 
-  --wine: #9c2b25;
-  --wine-dark: #7f211d;
-  --wine-soft: #f4e4e1;
-  --wine-light: #d9948d;
-  --wine-tint: #f3e7e4;
-  --wine-border: #e6c3be;
+  /* «شرابی» قدیمی حذف شد؛ این توکن‌ها اکنون به نارنجی برند اشاره می‌کنند
+     تا بدون تغییر در همه‌جای کد، زرشکی از پالت برداشته شود. */
+  --wine: #a1520a;         /* نارنجی تیره — جایگزین اکسنت زرشکی روی پس‌زمینه روشن */
+  --wine-dark: #834005;    /* نارنجی تیره‌تر برای هاور */
+  --wine-soft: #fceedc;    /* تینت نارنجی ملایم */
+  --wine-light: #f4a24e;   /* نارنجی روشن برای پس‌زمینه تیره */
+  --wine-tint: #fceedc;    /* تینت نارنجی برای پس‌زمینه */
+  --wine-border: #f0d3a8;  /* حاشیه نارنجی ملایم */
 
   --gold: #bd9a48;
   --gold-deep: #a17f31;
@@ -57,7 +59,7 @@
   --line: #e7dfcf;
   --line-dark: rgba(239, 231, 216, 0.14);
 
-  --danger: #9c2b25;
+  --danger: #d64533;   /* قرمز روشن فقط برای اکشن حذف (نه زرشکی) */
 
   --radius: 14px;
   --radius-lg: 20px;
@@ -101,7 +103,7 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--wine);
-  box-shadow: 0 0 0 3px rgba(156, 43, 37, 0.1);
+  box-shadow: 0 0 0 3px rgba(217, 102, 10, 0.1);
 }
 label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px; }
 
@@ -283,8 +285,8 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 /* ---------- هیرو ---------- */
 .hero {
   background:
-    radial-gradient(900px 420px at 12% -10%, rgba(156, 43, 37, 0.14), transparent 60%),
-    radial-gradient(760px 400px at 95% 115%, rgba(156, 43, 37, 0.12), transparent 55%),
+    radial-gradient(900px 420px at 12% -10%, rgba(217, 102, 10, 0.14), transparent 60%),
+    radial-gradient(760px 400px at 95% 115%, rgba(217, 102, 10, 0.12), transparent 55%),
     linear-gradient(165deg, var(--espresso-900), var(--espresso-950));
   color: var(--on-dark);
   padding: 40px 0 60px;
@@ -295,7 +297,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   content: "";
   position: absolute; inset-inline: 0; bottom: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(156, 43, 37, 0.6), transparent);
+  background: linear-gradient(90deg, transparent, rgba(217, 102, 10, 0.6), transparent);
 }
 /* ویدیوی هیرو */
 .hero-media {
@@ -304,7 +306,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   border-radius: 22px;
   overflow: hidden;
   position: relative;
-  border: 1px solid rgba(156, 43, 37, 0.45);
+  border: 1px solid rgba(217, 102, 10, 0.45);
   box-shadow: 0 28px 60px rgba(0, 0, 0, 0.5);
   background: #000;
 }
@@ -544,7 +546,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   color: var(--espresso-800);
   transition: background 0.2s;
 }
-.p-stepper button:hover { background: rgba(156, 43, 37, 0.1); }
+.p-stepper button:hover { background: rgba(217, 102, 10, 0.1); }
 .p-stepper button .ico { width: 15px; height: 15px; }
 .p-stepper .st-val { font-weight: 700; color: var(--espresso-800); font-size: 0.78rem; white-space: nowrap; }
 
@@ -964,7 +966,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   color: var(--on-dark);
   padding: 44px 0;
   margin-bottom: 40px;
-  border-bottom: 1px solid rgba(156, 43, 37, 0.45);
+  border-bottom: 1px solid rgba(217, 102, 10, 0.45);
 }
 .page-head h1 {
   font-size: 1.5rem; font-weight: 900;
@@ -1062,7 +1064,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   background: var(--espresso-950);
   color: rgba(239, 231, 216, 0.66);
   padding: 52px 0 24px;
-  border-top: 1px solid rgba(156, 43, 37, 0.45);
+  border-top: 1px solid rgba(217, 102, 10, 0.45);
 }
 .footer-grid { display: grid; gap: 34px; }
 @media (min-width: 768px) { .footer-grid { grid-template-columns: 1.3fr 1fr 1fr; gap: 44px; } }
@@ -1098,7 +1100,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   transform: translateX(50%) translateY(20px);
   background: var(--espresso-900);
   color: var(--on-dark);
-  border: 1px solid rgba(156, 43, 37, 0.5);
+  border: 1px solid rgba(217, 102, 10, 0.5);
   padding: 12px 24px;
   border-radius: 999px;
   font-size: 0.85rem; font-weight: 500;
