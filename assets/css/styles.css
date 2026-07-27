@@ -149,6 +149,9 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 .header-inner { display: flex; align-items: center; gap: 16px; height: var(--header-h); }
 
 .logo { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.logo-img { height: 46px; width: auto; display: block; }
+.logo-fallback { display: flex; align-items: center; gap: 12px; }
+.logo-fallback[hidden] { display: none; }
 .logo-mark {
   width: 42px; height: 42px;
   border: 1.5px solid var(--gold);
@@ -164,6 +167,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   letter-spacing: 0.01em;
 }
 .logo-slogan { font-size: 0.62rem; color: var(--on-dark-2); font-weight: 400; letter-spacing: 0.14em; }
+@media (max-width: 768px) { .logo-img { height: 38px; } }
 
 .header-search { flex: 1; position: relative; display: none; max-width: 400px; }
 .header-search input {

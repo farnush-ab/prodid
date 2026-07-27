@@ -180,11 +180,15 @@ function renderHeader() {
   header.className = "site-header";
   header.innerHTML = `
     <div class="container header-inner">
-      <a class="logo" href="${PAGE("index")}" aria-label="پرودید">
-        <span class="logo-mark">${icon("steak")}</span>
-        <span class="logo-text">
-          <span class="logo-name">پرودید</span><br>
-          <span class="logo-slogan">${BRAND.slogan}</span>
+      <a class="logo" href="${PAGE("index")}" aria-label="پرودید — ${BRAND.slogan}">
+        <img class="logo-img" src="${ROOT}assets/img/logo.png" alt="پرودید — ${BRAND.slogan}"
+             onerror="this.remove(); const f=this.parentNode.querySelector('.logo-fallback'); if(f) f.hidden=false;">
+        <span class="logo-fallback" hidden>
+          <span class="logo-mark">${icon("steak")}</span>
+          <span class="logo-text">
+            <span class="logo-name">پرودید</span><br>
+            <span class="logo-slogan">${BRAND.slogan}</span>
+          </span>
         </span>
       </a>
       <form class="header-search" id="search-desktop" role="search">
