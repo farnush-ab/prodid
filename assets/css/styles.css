@@ -44,6 +44,8 @@
 
   /* رنگ‌های برند برگرفته از لوگو (نارنجی و سبز) */
   --brand-orange: #e9760a;        /* نارنجی روشن برای گرافیک/پس‌زمینه تیره */
+  --brand-orange-solid: #d9660a;  /* نارنجی توپر برای دکمه/چیپ با متن سفید */
+  --brand-orange-bevel: #a84f06;  /* لبه تیره دکمه سه‌بعدی نارنجی */
   --brand-orange-deep: #a1520a;   /* نارنجی تیره برای متن روی پس‌زمینه روشن */
   --brand-orange-light: #f4a24e;  /* نارنجی روشن برای متن روی هیروی تیره */
   --brand-orange-tint: #fceedc;
@@ -127,17 +129,17 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 .btn:hover { transform: translateY(-2px); }
 .btn:active { transform: translateY(0) scale(0.98); }
 
-.btn-primary { background: var(--wine); color: #fbf6ec; box-shadow: 0 8px 22px rgba(156, 43, 37, 0.3); }
-.btn-primary:hover { background: var(--wine-dark); box-shadow: 0 12px 28px rgba(156, 43, 37, 0.36); }
+.btn-primary { background: var(--brand-orange-solid); color: #fff; box-shadow: 0 8px 22px rgba(217, 102, 10, 0.32); }
+.btn-primary:hover { background: var(--brand-orange-bevel); box-shadow: 0 12px 28px rgba(217, 102, 10, 0.4); }
 
 .btn-dark { background: var(--espresso-800); color: var(--on-dark); }
 .btn-dark:hover { background: var(--espresso-950); }
 
-.btn-outline { border: 1.5px solid var(--wine); color: var(--wine); background: transparent; }
-.btn-outline:hover { background: var(--wine-tint); }
+.btn-outline { border: 1.5px solid var(--brand-orange); color: var(--brand-orange-deep); background: transparent; }
+.btn-outline:hover { background: var(--brand-orange-tint); }
 
 .btn-outline-light { border: 1.5px solid rgba(239, 231, 216, 0.4); color: var(--on-dark); background: transparent; }
-.btn-outline-light:hover { border-color: var(--wine-light); color: var(--wine-light); }
+.btn-outline-light:hover { border-color: var(--brand-orange-light); color: var(--brand-orange-light); }
 
 .btn-light { background: var(--surface); color: var(--ink); border: 1.5px solid var(--line); }
 .btn-light:hover { border-color: var(--gold); }
@@ -238,7 +240,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   border-bottom: 2px solid transparent;
   transition: color 0.25s, border-color 0.25s;
 }
-.main-nav a:hover, .main-nav a.active { color: #f7f1e4; border-color: var(--wine-light); }
+.main-nav a:hover, .main-nav a.active { color: #f7f1e4; border-color: var(--brand-orange-light); }
 
 .mobile-search { padding: 4px 20px 14px; background: rgba(28, 23, 18, 0.97); }
 .mobile-search .header-search { display: block; max-width: none; }
@@ -274,7 +276,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   transition: color 0.25s;
 }
 .bottom-nav a .ico { width: 21px; height: 21px; }
-.bottom-nav a.active { color: var(--wine); font-weight: 700; }
+.bottom-nav a.active { color: var(--brand-orange-deep); font-weight: 700; }
 .bottom-nav .cart-badge { top: 6px; left: calc(50% - 24px); }
 @media (min-width: 768px) { .bottom-nav { display: none; } }
 
@@ -523,7 +525,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   transition: background 0.25s, transform 0.2s var(--ease), color 0.25s;
 }
 .p-add .ico { width: 19px; height: 19px; }
-.p-add:hover { background: var(--wine); color: #fbf6ec; transform: scale(1.07); }
+.p-add:hover { background: var(--brand-green-deep); color: #fff; transform: scale(1.07); }
 .p-add.out { background: #eee9dd; color: #b4aa97; cursor: not-allowed; }
 
 /* استپر داخل کارت */
@@ -628,7 +630,8 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 .banner {
   border-radius: var(--radius-lg);
   background:
-    radial-gradient(500px 260px at 88% -30%, rgba(156, 43, 37, 0.2), transparent 60%),
+    radial-gradient(520px 280px at 88% -30%, rgba(233, 118, 10, 0.28), transparent 62%),
+    radial-gradient(420px 240px at 4% 130%, rgba(63, 164, 48, 0.22), transparent 60%),
     linear-gradient(150deg, var(--espresso-800), var(--espresso-950));
   color: var(--on-dark);
   padding: 34px 30px;
@@ -636,13 +639,13 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   align-items: center; justify-content: space-between;
   gap: 20px;
   margin: 48px 0;
-  border: 1px solid rgba(156, 43, 37, 0.35);
+  border: 1px solid rgba(233, 118, 10, 0.35);
 }
 .banner h3 {
   font-size: 1.2rem; font-weight: 900; margin-bottom: 6px;
   display: flex; align-items: center; gap: 10px;
 }
-.banner h3 .ico { color: var(--wine-light); }
+.banner h3 .ico { color: var(--brand-orange-light); }
 .banner p { color: rgba(239, 231, 216, 0.65); font-size: 0.88rem; font-weight: 300; }
 .banner .btn { flex-shrink: 0; }
 
@@ -663,14 +666,14 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 .trust-item .t-ico {
   width: 48px; height: 48px; flex-shrink: 0;
   border-radius: 50%;
-  background: var(--wine-tint);
+  background: var(--brand-orange-tint);
   display: grid; place-items: center;
-  color: var(--wine);
+  color: var(--brand-orange-deep);
 }
 .trust-item .t-ico .ico { width: 22px; height: 22px; }
 .trust-item b { display: block; font-size: 0.92rem; color: var(--espresso-800); }
 .trust-item span, .trust-item a { color: var(--ink-2); font-size: 0.85rem; }
-.trust-item a:hover { color: var(--wine); }
+.trust-item a:hover { color: var(--brand-green-deep); }
 @media (min-width: 768px) {
   .trust-card { grid-template-columns: repeat(3, 1fr); gap: 26px; padding: 10px 30px; }
   .trust-item { border-bottom: none; padding: 26px 0; }
@@ -692,7 +695,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   transition: all 0.25s var(--ease);
 }
 .chip:hover { border-color: var(--wine-border); }
-.chip.active { background: var(--wine); color: #fbf6ec; border-color: var(--wine); font-weight: 700; }
+.chip.active { background: var(--brand-orange-solid); color: #fff; border-color: var(--brand-orange-solid); font-weight: 700; }
 
 .shop-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .shop-controls select { width: auto; padding: 9px 14px; font-size: 0.85rem; }
@@ -705,7 +708,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   padding: 9px 14px;
   cursor: pointer; user-select: none;
 }
-.shop-controls .check input { width: auto; accent-color: var(--wine); }
+.shop-controls .check input { width: auto; accent-color: var(--brand-green); }
 .results-count { font-size: 0.8rem; color: var(--ink-2); margin-inline-start: auto; }
 
 .empty-state { text-align: center; padding: 80px 20px; color: var(--ink-2); }
@@ -750,15 +753,16 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 
 .note-box {
   display: flex; gap: 10px; align-items: flex-start;
-  background: var(--wine-soft);
-  color: var(--wine-dark);
-  border: 1px solid var(--wine-border);
+  background: var(--brand-green-tint);
+  color: var(--brand-green-deep);
+  border: 1px solid var(--brand-green-border);
   border-radius: var(--radius);
   padding: 12px 16px;
   font-size: 0.82rem;
   margin-top: 14px;
   line-height: 1.8;
 }
+.note-box a { color: var(--brand-green-deep); text-decoration: underline; }
 .note-box .ico { flex-shrink: 0; margin-top: 4px; width: 18px; height: 18px; }
 
 .qty-row { display: flex; align-items: center; gap: 14px; margin: 20px 0; flex-wrap: wrap; }
@@ -841,7 +845,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   margin: 12px 0; line-height: 1.8;
   display: flex; gap: 8px; align-items: flex-start;
 }
-.sum-note .ico { flex-shrink: 0; width: 15px; height: 15px; margin-top: 4px; color: var(--wine); }
+.sum-note .ico { flex-shrink: 0; width: 15px; height: 15px; margin-top: 4px; color: var(--brand-green-deep); }
 .min-order-warn {
   background: var(--wine-soft);
   color: var(--wine-dark);
@@ -905,7 +909,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 }
 .pay-option:hover { border-color: var(--wine-border); }
 .pay-option:has(input:checked) { border-color: var(--wine); background: var(--wine-tint); }
-.pay-option input { width: auto; margin-top: 7px; accent-color: var(--wine); }
+.pay-option input { width: auto; margin-top: 7px; accent-color: var(--brand-orange-solid); }
 .pay-option b { font-size: 0.9rem; display: flex; align-items: center; gap: 7px; color: var(--espresso-800); }
 .pay-option b .ico { width: 17px; height: 17px; color: var(--wine); }
 .pay-option span span { font-size: 0.78rem; color: var(--ink-2); display: block; }
@@ -1539,15 +1543,15 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 
 /* دکمه اصلی با لبه سه‌بعدی و افکت فشردن */
 .btn-primary {
-  box-shadow: 0 4px 0 #6d1c18, 0 10px 24px rgba(156, 43, 37, 0.3);
+  box-shadow: 0 4px 0 var(--brand-orange-bevel), 0 10px 24px rgba(217, 102, 10, 0.32);
 }
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 0 #6d1c18, 0 14px 30px rgba(156, 43, 37, 0.36);
+  box-shadow: 0 6px 0 var(--brand-orange-bevel), 0 14px 30px rgba(217, 102, 10, 0.4);
 }
 .btn-primary:active {
   transform: translateY(3px);
-  box-shadow: 0 1px 0 #6d1c18, 0 4px 12px rgba(156, 43, 37, 0.3);
+  box-shadow: 0 1px 0 var(--brand-orange-bevel), 0 4px 12px rgba(217, 102, 10, 0.32);
 }
 .p-add { box-shadow: 0 3px 0 #0d0a08; }
 .p-add:active { transform: translateY(2px) !important; box-shadow: 0 1px 0 #0d0a08; }
