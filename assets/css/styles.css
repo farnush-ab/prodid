@@ -1202,7 +1202,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   border: 8px solid transparent;
   border-top-color: var(--surface);
 }
-.as-walk-bubble b { display: block; font-size: 0.76rem; color: var(--wine); margin-bottom: 2px; }
+.as-walk-bubble b { display: block; font-size: 0.76rem; color: var(--brand-orange-deep); margin-bottom: 2px; }
 .as-walk-bubble span { font-size: 0.8rem; color: var(--ink); }
 /* نزدیک لبه راست، حباب داخل صفحه بماند */
 .as-walker .as-walk-bubble { left: auto; right: -10px; transform: translateY(8px); }
@@ -1221,7 +1221,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 .as-fab {
   width: 56px; height: 56px;
   border-radius: 50%;
-  border: 2px solid var(--wine);
+  border: 2px solid var(--brand-orange);
   overflow: visible;
   position: relative;
   padding: 0;
@@ -1272,7 +1272,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   color: var(--on-dark);
   flex-shrink: 0;
 }
-.as-head img { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--wine-light); }
+.as-head img { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--brand-orange-light); }
 .as-head-t { line-height: 1.5; flex: 1; min-width: 0; }
 .as-head-t b { display: block; font-size: 0.88rem; }
 .as-head-t span { font-size: 0.68rem; color: var(--on-dark-2); }
@@ -1316,11 +1316,11 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 }
 .as-user {
   align-self: flex-end;
-  background: var(--wine);
-  color: #fbf6ec;
+  background: var(--brand-orange-solid);
+  color: #fff;
   border-radius: 16px 16px 4px 16px;
 }
-.as-r-title { display: block; color: var(--wine); font-size: 0.82rem; margin-bottom: 2px; }
+.as-r-title { display: block; color: var(--brand-orange-deep); font-size: 0.82rem; margin-bottom: 2px; }
 .as-typing { display: flex; gap: 4px; padding: 14px 16px; }
 .as-typing span {
   width: 6px; height: 6px;
@@ -1367,8 +1367,8 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 }
 .as-p-view { background: var(--bg-soft); color: var(--ink-2); }
 .as-p-view:hover { color: var(--espresso-800); }
-.as-p-add { background: var(--wine); color: #fbf6ec; }
-.as-p-add:hover { background: var(--wine-dark); }
+.as-p-add { background: var(--brand-orange-solid); color: #fff; }
+.as-p-add:hover { background: var(--brand-orange-bevel); }
 .as-p-btns .ico { width: 15px; height: 15px; }
 
 .as-contact { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
@@ -1393,7 +1393,7 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   color: var(--ink-2);
   transition: all 0.2s;
 }
-.as-chip:hover { border-color: var(--wine-border); color: var(--wine); }
+.as-chip:hover { border-color: var(--brand-orange); color: var(--brand-orange-deep); }
 
 /* ورودی */
 .as-inputrow {
@@ -1416,12 +1416,12 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   width: 44px; height: 44px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: var(--wine);
-  color: #fbf6ec;
+  background: var(--brand-orange-solid);
+  color: #fff;
   display: grid; place-items: center;
   transition: background 0.2s, transform 0.2s var(--ease);
 }
-.as-inputrow button:hover { background: var(--wine-dark); transform: scale(1.06); }
+.as-inputrow button:hover { background: var(--brand-orange-bevel); transform: scale(1.06); }
 .as-inputrow button .ico { width: 18px; height: 18px; transform: scaleX(-1); }
 
 @media (prefers-reduced-motion: reduce) {
