@@ -572,22 +572,30 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 }
 .wctl-inp:focus { outline: none; background: #fff; border-bottom-color: var(--wine); }
 .wctl-unit { font-size: 0.8rem; font-weight: 700; color: var(--espresso-500, #8b7f6e); }
-.wctl { margin: 18px 0; }
-.wctl-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; color: var(--espresso-800); margin-bottom: 12px; }
+.wctl { margin: 28px 0; }
+.wctl-label { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 0.95rem; color: var(--espresso-800); margin-bottom: 18px; }
 .wctl-label .ico { width: 18px; height: 18px; color: var(--wine); }
-.wctl-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.wctl-price { font-size: 0.82rem; color: var(--espresso-500, #8b7f6e); line-height: 1.5; }
-.wctl-price b { font-size: 1.15rem; font-weight: 900; color: var(--wine); }
-.wchips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+/* کنترل وزن و قیمت داخل یک کادر مرتب */
+.wctl-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
+}
+.wctl-price { font-size: 0.8rem; color: var(--espresso-500, #8b7f6e); line-height: 1.7; }
+.wctl-price b { display: block; font-size: 1.35rem; font-weight: 900; color: var(--wine); margin-top: 2px; }
+.wchips { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 26px; }
 .wchip {
-  padding: 7px 14px; border-radius: 999px; border: 1px solid var(--wine-border);
+  padding: 9px 18px; border-radius: 999px; border: 1px solid var(--wine-border);
   background: var(--wine-tint); color: var(--espresso-800); font-weight: 700;
-  font-size: 0.8rem; cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s;
+  font-size: 0.82rem; cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
 .wchip:hover { border-color: var(--wine); }
-.wchip.active { background: var(--wine); border-color: var(--wine); color: #fbf6ec; }
-.wctl-hint { display: flex; align-items: flex-start; gap: 6px; margin-top: 14px; font-size: 0.76rem; color: var(--espresso-500, #8b7f6e); line-height: 1.7; }
-.wctl-hint .ico { width: 15px; height: 15px; flex: none; margin-top: 3px; color: var(--wine); }
+.wchip.active { background: var(--wine); border-color: var(--wine); color: #fff; }
+.wctl-hint { display: flex; align-items: flex-start; gap: 7px; margin-top: 20px; font-size: 0.76rem; color: var(--espresso-500, #8b7f6e); line-height: 1.8; }
+.wctl-hint .ico { width: 15px; height: 15px; flex: none; margin-top: 3px; color: var(--brand-green-deep); }
 
 /* ---------- نوار ویژگی‌ها ---------- */
 .features-band {
