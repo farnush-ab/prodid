@@ -586,15 +586,15 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 }
 .wctl-price { font-size: 0.8rem; color: var(--espresso-500, #8b7f6e); line-height: 1.7; }
 .wctl-price b { display: block; font-size: 1.35rem; font-weight: 900; color: var(--wine); margin-top: 2px; }
-.wchips { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 26px; }
+.wchips { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 28px; }
 .wchip {
-  padding: 9px 18px; border-radius: 999px; border: 1px solid var(--wine-border);
-  background: var(--wine-tint); color: var(--espresso-800); font-weight: 700;
+  padding: 8px 18px; border-radius: 999px; border: 1px solid var(--line);
+  background: transparent; color: var(--espresso-500, #8b7f6e); font-weight: 600;
   font-size: 0.82rem; cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-.wchip:hover { border-color: var(--wine); }
-.wchip.active { background: var(--wine); border-color: var(--wine); color: #fff; }
-.wctl-hint { display: flex; align-items: flex-start; gap: 7px; margin-top: 20px; font-size: 0.76rem; color: var(--espresso-500, #8b7f6e); line-height: 1.8; }
+.wchip:hover { border-color: var(--wine); color: var(--wine); }
+.wchip.active { background: var(--wine-tint); border-color: var(--wine); color: var(--wine); font-weight: 700; }
+.wctl-hint { display: flex; align-items: flex-start; gap: 7px; margin-top: 22px; font-size: 0.75rem; color: var(--espresso-500, #8b7f6e); line-height: 1.8; }
 .wctl-hint .ico { width: 15px; height: 15px; flex: none; margin-top: 3px; color: var(--brand-green-deep); }
 
 /* ---------- نوار ویژگی‌ها ---------- */
