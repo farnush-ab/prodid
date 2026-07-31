@@ -687,7 +687,7 @@ function initProductPage() {
 }
 
 /* انتخاب‌گر وزن دلخواه در صفحه محصول (محصولات وزنی) */
-const WEIGHT_CHIPS = [250, 500, 750, 1000, 1500];
+const WEIGHT_CHIPS = [250, 500, 1000];
 function weightControlHTML(p) {
   const inCart = Cart.qty(p.id);
   const grams = inCart > 0 ? Math.round(inCart * 1000) : 500;
