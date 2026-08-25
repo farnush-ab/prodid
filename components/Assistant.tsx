@@ -543,6 +543,7 @@ export function Assistant() {
       walkTimers.current.forEach(clearTimeout);
       root.remove();
       walkerRef.current?.remove();
+      built.current = false; // اجازه بازسازی ویجت در remount شبیه‌سازی‌شده‌ی React Strict Mode (dev)
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
