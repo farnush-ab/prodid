@@ -39,6 +39,9 @@ export const Profile = {
   write(p: ProfileData) {
     localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
   },
+  clear() {
+    localStorage.removeItem(PROFILE_KEY);
+  },
 };
 
 export const Orders = {
@@ -54,5 +57,33 @@ export const Orders = {
     const list = Orders.read();
     list.unshift(order);
     localStorage.setItem(ORDERS_KEY, JSON.stringify(list.slice(0, 20)));
+  },
+  clear() {
+    localStorage.removeItem(ORDERS_KEY);
+  },
+};
+
+/* ---------------- تنظیمات دستیار هوشمند (localStorage) ---------------- */
+const ASSISTANT_KEY = "prodid_assistant";
+
+export const AssistantPrefs = {
+  isDisabled(): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+      return !!JSON.parse(localStorage.getItem(ASSISTANT_KEY) || "{}")?.disabled;
+    } catch {
+      return false;
+    }
+  },
+  setDisabled(disabled: boolean) {
+    let state: Record<string, unknown> = {};
+    try {
+      state = JSON.parse(localStorage.getItem(ASSISTANT_KEY) || "{}") || {};
+    } catch {
+      state = {};
+    }
+    if (disabled) state.disabled = true;
+    else delete state.disabled;
+    localStorage.setItem(ASSISTANT_KEY, JSON.stringify(state));
   },
 };
