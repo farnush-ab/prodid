@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Icon } from "@/lib/icons";
 import { pageHref } from "@/lib/page";
 import { useCart, cartCount } from "@/lib/cart";
@@ -22,18 +23,23 @@ export function BottomNav() {
   const n = cartCount(useCart());
   const pathname = usePathname();
   const page = currentPageId(pathname);
+  const { status } = useSession();
 
   return (
     <nav className="bottom-nav" aria-label="منوی موبایل">
-      {ITEMS.map((it) => (
-        <Link key={it.id} href={pageHref(it.id)} className={page === it.id ? "active" : ""}>
-          <Icon name={it.ico} />
-          {it.label}
-          {"badge" in it && it.badge ? (
-            <span className="cart-badge">{n ? new Intl.NumberFormat("fa-IR").format(n) : ""}</span>
-          ) : null}
-        </Link>
-      ))}
+      {ITEMS.map((it) => {
+        const href = it.id === "account" && status === "unauthenticated" ? pageHref("login") : pageHref(it.id);
+        const active = page === it.id || (it.id === "account" && page === "login");
+        return (
+          <Link key={it.id} href={href} className={active ? "active" : ""}>
+            <Icon name={it.ico} />
+            {it.label}
+            {"badge" in it && it.badge ? (
+              <span className="cart-badge">{n ? new Intl.NumberFormat("fa-IR").format(n) : ""}</span>
+            ) : null}
+          </Link>
+        );
+      })}
     </nav>
   );
 }

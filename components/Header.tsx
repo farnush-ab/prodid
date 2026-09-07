@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Icon } from "@/lib/icons";
 import { BRAND } from "@/lib/data";
 import { toFa } from "@/lib/format";
@@ -48,7 +49,9 @@ export function Header() {
   const n = cartCount(useCart());
   const pathname = usePathname();
   const page = currentPageId(pathname);
+  const { status } = useSession();
   const [logoOk, setLogoOk] = useState(true);
+  const accountHref = status === "unauthenticated" ? pageHref("login") : pageHref("account");
 
   return (
     <header className="site-header">
@@ -85,7 +88,7 @@ export function Header() {
         </a>
 
         <div className="header-actions">
-          <Link className="icon-btn" href={pageHref("account")} title="حساب کاربری">
+          <Link className="icon-btn" href={accountHref} title={status === "authenticated" ? "حساب کاربری" : "ورود به حساب"}>
             <Icon name="user" />
           </Link>
           <Link className="icon-btn" href={pageHref("cart")} title="سبد خرید">
@@ -100,7 +103,7 @@ export function Header() {
           <ul>
             {NAV_LINKS.map((l) => (
               <li key={l.id}>
-                <Link href={l.href} className={page === l.id ? "active" : ""}>
+                <Link href={l.href} className={page === l.id || (l.id === "account" && page === "login") ? "active" : ""}>
                   {l.label}
                 </Link>
               </li>

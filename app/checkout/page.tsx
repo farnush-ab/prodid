@@ -1,19 +1,51 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Icon } from "@/lib/icons";
 import { BRAND } from "@/lib/data";
-import { fmtPrice, qtyLabel, faNum } from "@/lib/format";
+import { fmtPrice, qtyLabel } from "@/lib/format";
 import { pageHref } from "@/lib/page";
 import { Cart, useCart, cartItems, cartTotal, cartHasWeightItems } from "@/lib/cart";
-import { Profile, Orders } from "@/lib/profile";
+import { Profile } from "@/lib/profile";
 import { toast } from "@/lib/toast";
+import { normalizePhone } from "@/lib/phone";
+import { AppModal } from "@/components/AppModal";
+import { LoginPanel } from "@/components/LoginPanel";
+import { PaymentSheet } from "@/components/PaymentSheet";
+import {
+  DELIVERY_DAYS,
+  DELIVERY_SLOTS,
+  LAST_ORDER_KEY,
+  PAY_METHODS,
+  dayLabel,
+  orderWhatsappUrl,
+  slotLabel,
+  type PayMethod,
+  type PublicOrder,
+} from "@/lib/order";
 
-const SLOTS = ["۹ تا ۱۲", "۱۲ تا ۱۵", "۱۵ تا ۱۸", "۱۸ تا ۲۱"];
+function SuccessBox({ order }: { order: PublicOrder | null }) {
+  if (!order) {
+    return (
+      <div className="success-box">
+        <div className="s-ico">
+          <Icon name="check" />
+        </div>
+        <h2>سفارش شما ثبت شد!</h2>
+        <p>جزئیات سفارش برای فروشگاه ارسال شد. همکاران ما به‌زودی برای تایید نهایی با شما تماس می‌گیرند.</p>
+        <Link className="btn btn-primary btn-block" href={pageHref("shop")}>
+          بازگشت به فروشگاه
+        </Link>
+        <Link className="btn btn-light btn-block mt-1" href={pageHref("account")}>
+          مشاهده سفارش‌های من
+        </Link>
+      </div>
+    );
+  }
 
-function SuccessBox() {
   return (
     <div className="success-box">
       <div className="s-ico">
@@ -21,8 +53,11 @@ function SuccessBox() {
       </div>
       <h2>سفارش شما ثبت شد!</h2>
       <p>
-        جزئیات سفارش در واتس‌اپ برای فروشگاه ارسال شد. همکاران ما به‌زودی برای تایید نهایی و اعلام مبلغ دقیق
-        (محصولات وزنی) با شما تماس می‌گیرند.
+        شماره سفارش <b className="num" dir="ltr">{order.orderNo}</b>
+        {order.hasWeightItems ? " — مبلغ نهایی محصولات وزنی پس از وزن‌کشی اعلام می‌شود." : ""}
+      </p>
+      <p className="muted" style={{ marginTop: "-12px" }}>
+        {dayLabel(order.day)} — ساعت {slotLabel(order.slot)}
       </p>
       <Link className="btn btn-primary btn-block" href={pageHref("shop")}>
         بازگشت به فروشگاه
@@ -30,6 +65,9 @@ function SuccessBox() {
       <Link className="btn btn-light btn-block mt-1" href={pageHref("account")}>
         مشاهده سفارش‌های من
       </Link>
+      <a className="btn btn-outline btn-block mt-1" href={orderWhatsappUrl(order, "track")} target="_blank" rel="noopener">
+        <Icon name="chat" /> پیگیری در واتس‌اپ
+      </a>
     </div>
   );
 }
@@ -37,23 +75,50 @@ function SuccessBox() {
 function CheckoutForm() {
   const cart = useCart();
   const router = useRouter();
+  const { data: session } = useSession();
   const items = cartItems(cart);
   const total = cartTotal(cart);
+  const underMin = total < BRAND.minOrder;
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [day, setDay] = useState("امروز (ارسال همان‌روز)");
-  const [slot, setSlot] = useState(SLOTS[0]);
-  const [pay, setPay] = useState("کارت به کارت");
+  const [day, setDay] = useState<(typeof DELIVERY_DAYS)[number]["id"]>("today");
+  const [slot, setSlot] = useState<(typeof DELIVERY_SLOTS)[number]["id"]>(DELIVERY_SLOTS[0].id);
+  const [pay, setPay] = useState<PayMethod>("card");
   const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [modal, setModal] = useState<null | "login" | "pay">(null);
+  const loginNext = useRef<"stay" | "pay">("stay");
 
   useEffect(() => {
-    const profile = Profile.read();
-    if (profile.name) setName(profile.name);
-    if (profile.phone) setPhone(profile.phone);
-    if (profile.address) setAddress(profile.address);
-  }, []);
+    const local = Profile.read();
+    let cancelled = false;
+    (async () => {
+      if (session?.user) {
+        try {
+          const res = await fetch("/api/me");
+          if (res.ok) {
+            const me = await res.json();
+            if (cancelled) return;
+            setName(me.name || local.name || "");
+            setPhone(me.phone || session.user.phone || local.phone || "");
+            setAddress(me.address || local.address || "");
+            return;
+          }
+        } catch {
+          /* fallback below */
+        }
+      }
+      if (cancelled) return;
+      if (local.name) setName(local.name);
+      if (local.phone) setPhone(local.phone);
+      if (local.address) setAddress(local.address);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
 
   if (!items.length) {
     return (
@@ -71,57 +136,74 @@ function CheckoutForm() {
     );
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     const n = name.trim();
-    const ph = phone.trim();
+    const ph = normalizePhone(phone);
     const addr = address.trim();
     if (!n || !ph || !addr) {
       toast("لطفا نام، موبایل و آدرس را کامل کنید");
       return;
     }
-    if (!/^0?9\d{9}$/.test(ph.replace(/[^\d]/g, ""))) {
-      toast("شماره موبایل معتبر نیست");
+    if (underMin) {
+      toast("مبلغ سفارش به حداقل نرسیده است");
       return;
     }
 
-    Profile.write({ name: n, phone: ph, address: addr });
+    if (pay === "online") {
+      if (!session?.user) {
+        loginNext.current = "pay";
+        setModal("login");
+        return;
+      }
+      setModal("pay");
+      return;
+    }
 
-    const lines = [
-      "*سفارش جدید از سایت پرودید*",
-      "──────────────",
-      ...items.map(
-        ({ p, qty }, i) =>
-          `${faNum.format(i + 1)}. ${p.name} — ${qtyLabel(p, qty)} — ${fmtPrice(p.price! * qty)} تومان${
-            p.sale === "w" ? " (تقریبی)" : ""
-          }`
-      ),
-      "──────────────",
-      `جمع کل${cartHasWeightItems(cart) ? " (تقریبی)" : ""}: ${fmtPrice(total)} تومان`,
-      `گیرنده: ${n}`,
-      `موبایل: ${ph}`,
-      `آدرس: ${addr}`,
-      `زمان تحویل: ${day} — ساعت ${slot}`,
-      `روش پرداخت: ${pay}`,
-      notes.trim() ? `توضیحات: ${notes.trim()}` : "",
-    ].filter(Boolean);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: items.map(({ p, qty }) => ({ id: p.id, qty })),
+          name: n,
+          phone: ph,
+          address: addr,
+          day,
+          slot,
+          pay,
+          notes,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data.error || "ثبت سفارش انجام نشد");
+        return;
+      }
 
-    Orders.add({
-      date: new Date().toISOString(),
-      items: items.map(({ p, qty }) => ({ id: p.id, name: p.name, qty, price: p.price })),
-      total,
-      day,
-      slot,
-      pay,
-    });
-
-    const url = `https://wa.me/${BRAND.phoneIntl}?text=${encodeURIComponent(lines.join("\n"))}`;
-    Cart.clear();
-    window.open(url, "_blank");
-    router.push(`${pageHref("checkout")}?done=1`);
+      const order = data.order as PublicOrder;
+      Profile.write({ name: n, phone: ph, address: addr });
+      try {
+        sessionStorage.setItem(LAST_ORDER_KEY, JSON.stringify(order));
+      } catch {
+        /* ignore */
+      }
+      Cart.clear();
+      if (data.whatsappUrl) window.open(data.whatsappUrl, "_blank");
+      const q = new URLSearchParams({ done: "1", no: order.orderNo });
+      if (order.viewToken) q.set("t", order.viewToken);
+      router.push(`${pageHref("checkout")}?${q.toString()}`);
+    } catch {
+      toast("ارتباط با سرور برقرار نشد");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
+    <>
     <form className="checkout-grid" noValidate onSubmit={submit}>
       <div>
         <div className="form-card">
@@ -146,6 +228,23 @@ function CheckoutForm() {
               />
             </div>
           </div>
+          {!session?.user ? (
+            <p className="muted mt-1">
+              برای ذخیره مشخصات در حساب،{" "}
+              <button
+                type="button"
+                className="section-link"
+                style={{ marginTop: 0, display: "inline" }}
+                onClick={() => {
+                  loginNext.current = "stay";
+                  setModal("login");
+                }}
+              >
+                با موبایل وارد شوید
+              </button>
+              . خرید مهمان هم ممکن است.
+            </p>
+          ) : null}
         </div>
 
         <div className="form-card">
@@ -177,22 +276,25 @@ function CheckoutForm() {
           <div className="form-grid cols-2 mb-2">
             <div>
               <label htmlFor="f-day">روز تحویل</label>
-              <select id="f-day" value={day} onChange={(e) => setDay(e.target.value)}>
-                <option value="امروز (ارسال همان‌روز)">امروز (ارسال همان‌روز)</option>
-                <option value="فردا">فردا</option>
+              <select id="f-day" value={day} onChange={(e) => setDay(e.target.value as typeof day)}>
+                {DELIVERY_DAYS.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
           <label>بازه زمانی</label>
           <div className="slot-grid">
-            {SLOTS.map((s) => (
+            {DELIVERY_SLOTS.map((s) => (
               <button
-                key={s}
+                key={s.id}
                 type="button"
-                className={`slot${slot === s ? " active" : ""}`}
-                onClick={() => setSlot(s)}
+                className={`slot${slot === s.id ? " active" : ""}`}
+                onClick={() => setSlot(s.id)}
               >
-                {s}
+                {s.label}
               </button>
             ))}
           </div>
@@ -202,33 +304,17 @@ function CheckoutForm() {
           <h3>
             <span className="step-num">۴</span> روش پرداخت
           </h3>
-          <label className="pay-option">
-            <input type="radio" name="pay" value="کارت به کارت" checked={pay === "کارت به کارت"} onChange={() => setPay("کارت به کارت")} />
-            <span>
-              <b>
-                <Icon name="card" /> کارت به کارت
-              </b>
-              <span>شماره کارت پس از تایید سفارش برای شما ارسال می‌شود.</span>
-            </span>
-          </label>
-          <label className="pay-option">
-            <input type="radio" name="pay" value="پرداخت در محل" checked={pay === "پرداخت در محل"} onChange={() => setPay("پرداخت در محل")} />
-            <span>
-              <b>
-                <Icon name="wallet" /> پرداخت در محل تحویل
-              </b>
-              <span>پرداخت با کارت‌خوان سیار یا نقدی هنگام تحویل.</span>
-            </span>
-          </label>
-          <label className="pay-option" style={{ opacity: 0.55 }}>
-            <input type="radio" name="pay" value="پرداخت آنلاین" disabled />
-            <span>
-              <b>
-                <Icon name="card" /> پرداخت آنلاین <span className="soon-chip">به‌زودی</span>
-              </b>
-              <span>اتصال به درگاه پرداخت اینترنتی در حال راه‌اندازی است.</span>
-            </span>
-          </label>
+          {PAY_METHODS.map((m) => (
+            <label className="pay-option" key={m.id}>
+              <input type="radio" name="pay" value={m.id} checked={pay === m.id} onChange={() => setPay(m.id)} />
+              <span>
+                <b>
+                  <Icon name={m.icon} /> {m.label}
+                </b>
+                <span>{m.hint}</span>
+              </span>
+            </label>
+          ))}
         </div>
 
         <div className="form-card">
@@ -268,8 +354,15 @@ function CheckoutForm() {
           <Icon name="truck" />
           <span>{BRAND.deliveryFeeNote}.</span>
         </p>
-        <button type="submit" className="btn btn-primary btn-block">
-          <Icon name="chat" /> ثبت نهایی سفارش در واتس‌اپ
+        {underMin ? (
+          <p className="min-order-warn">
+            حداقل مبلغ سفارش {fmtPrice(BRAND.minOrder)} تومان است. {fmtPrice(BRAND.minOrder - total)} تومان دیگر به سبد
+            اضافه کنید.
+          </p>
+        ) : null}
+        <button type="submit" className="btn btn-primary btn-block" disabled={busy || underMin}>
+          <Icon name={pay === "online" ? "card" : "check"} />{" "}
+          {busy ? "در حال ثبت…" : pay === "online" ? "ادامه و پرداخت" : "ثبت سفارش"}
         </button>
         <a className="btn btn-outline btn-block mt-1" href={`tel:${BRAND.phone}`}>
           <Icon name="phone" /> ثبت سفارش با تماس
@@ -283,12 +376,73 @@ function CheckoutForm() {
         </p>
       </aside>
     </form>
+
+    {modal === "login" ? (
+      <AppModal
+        title={loginNext.current === "pay" ? "ورود برای پرداخت" : "ورود به حساب"}
+        subtitle={
+          loginNext.current === "pay"
+            ? "با شماره موبایل وارد شوید؛ بعد از ورود صفحه پرداخت همین‌جا باز می‌شود"
+            : "با شماره موبایل وارد شوید؛ ثبت‌نام جدا لازم نیست"
+        }
+        icon="user"
+        onClose={() => setModal(null)}
+      >
+        <LoginPanel
+          embedded
+          initialPhone={phone}
+          onSuccess={() => {
+            if (loginNext.current === "pay") setModal("pay");
+            else setModal(null);
+          }}
+        />
+      </AppModal>
+    ) : null}
+
+    {modal === "pay" ? (
+      <AppModal
+        title="پرداخت آنلاین"
+        subtitle="درگاه زرین‌پال روی همین مرحله وصل می‌شود"
+        icon="card"
+        wide
+        onClose={() => setModal(null)}
+      >
+        <PaymentSheet items={items} total={total} hasWeight={cartHasWeightItems(cart)} phone={session?.user.phone || phone} />
+      </AppModal>
+    ) : null}
+    </>
   );
 }
 
 function CheckoutContent() {
-  const done = useSearchParams()?.get("done") === "1";
-  return <main className="container" id="checkout-wrap">{done ? <SuccessBox /> : <CheckoutForm />}</main>;
+  const params = useSearchParams();
+  const done = params.get("done") === "1";
+  const no = params.get("no");
+  const token = params.get("t");
+  const [order, setOrder] = useState<PublicOrder | null>(null);
+
+  useEffect(() => {
+    if (!done) return;
+    try {
+      const cached = sessionStorage.getItem(LAST_ORDER_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as PublicOrder;
+        if (!no || parsed.orderNo === no) setOrder(parsed);
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!no) return;
+    const q = token ? `?t=${encodeURIComponent(token)}` : "";
+    fetch(`/api/orders/${encodeURIComponent(no)}${q}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.order) setOrder(data.order);
+      })
+      .catch(() => {});
+  }, [done, no, token]);
+
+  return <main className="container" id="checkout-wrap">{done ? <SuccessBox order={order} /> : <CheckoutForm />}</main>;
 }
 
 export default function CheckoutPage() {

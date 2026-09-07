@@ -16,7 +16,11 @@ export function parseIntFa(s: string | number): number {
 
 /* واحد نمایش تعداد */
 export function qtyLabel(p: Product, qty: number): string {
-  if (p.sale !== "w") return `${faNum.format(qty)} بسته`;
+  return qtyLabelBySale(p.sale, qty);
+}
+
+export function qtyLabelBySale(sale: Product["sale"], qty: number): string {
+  if (sale !== "w") return `${faNum.format(qty)} بسته`;
   const g = Math.round(qty * 1000);
   return g >= 1000 ? `${faNum.format(g / 1000)} کیلوگرم` : `${faNum.format(g)} گرم`;
 }

@@ -2,12 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 import { Icon } from "@/lib/icons";
 import { pageHref } from "@/lib/page";
-import { BRAND, getProduct } from "@/lib/data";
-import { Profile, Orders, AssistantPrefs, type Order, type OrderItem } from "@/lib/profile";
-import { fmtPrice, faNum, qtyLabel } from "@/lib/format";
+import { BRAND } from "@/lib/data";
+import { Profile, AssistantPrefs } from "@/lib/profile";
+import { fmtPrice, faNum, qtyLabelBySale, toFa } from "@/lib/format";
 import { toast } from "@/lib/toast";
+import {
+  ORDER_STATUS_LABEL,
+  PAY_METHOD_LABEL,
+  PAY_STATUS_LABEL,
+  dayLabel,
+  orderWhatsappUrl,
+  slotLabel,
+  type PublicOrder,
+} from "@/lib/order";
 
 type TabId = "overview" | "profile" | "orders" | "settings";
 
@@ -18,61 +28,91 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: "settings", label: "تنظیمات", icon: "shield" },
 ];
 
-function orderDate(o: Order) {
-  return new Date(o.date).toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric" });
-}
-
-function orderItemQty(it: OrderItem) {
-  const p = getProduct(it.id);
-  return p ? qtyLabel(p, it.qty) : `${faNum.format(it.qty)} عدد`;
-}
-
-function trackOnWhatsapp(o: Order) {
-  const lines = [
-    "*پیگیری سفارش پرودید*",
-    `تاریخ سفارش: ${orderDate(o)}`,
-    `زمان تحویل: ${o.day} — ساعت ${o.slot}`,
-    "──────────────",
-    ...o.items.map((it) => `${it.name} × ${orderItemQty(it)}`),
-    "──────────────",
-    `مبلغ: ${fmtPrice(o.total)} تومان`,
-  ];
-  window.open(`https://wa.me/${BRAND.phoneIntl}?text=${encodeURIComponent(lines.join("\n"))}`, "_blank");
+function orderDate(o: PublicOrder) {
+  return new Date(o.createdAt).toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric" });
 }
 
 export default function AccountPage() {
+  const { data: session, update } = useSession();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<PublicOrder[]>([]);
   const [assistantOn, setAssistantOn] = useState(true);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const profile = Profile.read();
-    setName(profile.name || "");
-    setPhone(profile.phone || "");
-    setAddress(profile.address || "");
-    setOrders(Orders.read());
+    const local = Profile.read();
     setAssistantOn(!AssistantPrefs.isDisabled());
-    setLoaded(true);
-  }, []);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const [meRes, orderRes] = await Promise.all([fetch("/api/me"), fetch("/api/orders")]);
+        if (meRes.ok) {
+          const me = await meRes.json();
+          if (!cancelled) {
+            setName(me.name || "");
+            setPhone(me.phone || session?.user.phone || "");
+            setAddress(me.address || "");
+            Profile.write({ name: me.name || "", phone: me.phone || "", address: me.address || "" });
+          }
+        } else if (!cancelled) {
+          setName(local.name || session?.user.name || "");
+          setPhone(session?.user.phone || local.phone || "");
+          setAddress(local.address || "");
+        }
+        if (orderRes.ok) {
+          const data = await orderRes.json();
+          if (!cancelled) setOrders(data.orders || []);
+        }
+      } catch {
+        if (!cancelled) {
+          setName(local.name || session?.user.name || "");
+          setPhone(session?.user.phone || local.phone || "");
+          setAddress(local.address || "");
+        }
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user.phone, session?.user.name]);
 
   const stats = useMemo(
     () => ({
       count: orders.length,
-      total: orders.reduce((s, o) => s + o.total, 0),
+      total: orders.reduce((s, o) => s + (o.finalTotal ?? o.estimatedTotal), 0),
       last: orders.length ? orderDate(orders[0]) : "—",
     }),
     [orders]
   );
 
-  function saveProfile(e: React.FormEvent) {
+  async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
-    Profile.write({ name: name.trim(), phone: phone.trim(), address: address.trim() });
-    toast("اطلاعات شما ذخیره شد");
+    const n = name.trim();
+    const addr = address.trim();
+    try {
+      const res = await fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: n, address: addr }),
+      });
+      if (!res.ok) {
+        toast("ذخیره اطلاعات انجام نشد");
+        return;
+      }
+      Profile.write({ name: n, phone, address: addr });
+      await update({ name: n });
+      toast("اطلاعات شما ذخیره شد");
+    } catch {
+      toast("ذخیره اطلاعات انجام نشد");
+    }
   }
 
   function toggleAssistant(on: boolean) {
@@ -81,20 +121,42 @@ export default function AccountPage() {
     location.reload();
   }
 
-  function clearProfile() {
-    if (!confirm("مشخصات ذخیره‌شده (نام، موبایل، آدرس) پاک شود؟")) return;
-    Profile.clear();
-    setName("");
-    setPhone("");
-    setAddress("");
-    toast("اطلاعات پروفایل پاک شد");
+  async function clearProfile() {
+    if (!confirm("نام و آدرس ذخیره‌شده پاک شود؟ شماره موبایل حساب باقی می‌ماند.")) return;
+    try {
+      await fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "", address: "" }),
+      });
+      Profile.write({ name: "", phone, address: "" });
+      setName("");
+      setAddress("");
+      await update({ name: "" });
+      toast("اطلاعات پروفایل پاک شد");
+    } catch {
+      toast("پاک‌کردن اطلاعات انجام نشد");
+    }
   }
 
-  function clearOrders() {
-    if (!confirm("تاریخچه سفارش‌های ذخیره‌شده روی این دستگاه پاک شود؟")) return;
-    Orders.clear();
-    setOrders([]);
-    toast("تاریخچه سفارش‌ها پاک شد");
+  async function cancelOrder(orderNo: string) {
+    if (!confirm("این سفارش لغو شود؟")) return;
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderNo)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cancel" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data.error || "لغو سفارش انجام نشد");
+        return;
+      }
+      setOrders((list) => list.map((o) => (o.orderNo === orderNo ? data.order : o)));
+      toast("سفارش لغو شد");
+    } catch {
+      toast("لغو سفارش انجام نشد");
+    }
   }
 
   const initial = name.trim() ? name.trim()[0] : null;
@@ -106,7 +168,7 @@ export default function AccountPage() {
           <h1>
             <Icon name="user" /> حساب کاربری
           </h1>
-          <p>اطلاعات شما فقط روی همین دستگاه ذخیره می‌شود و در خریدهای بعدی به‌صورت خودکار تکمیل می‌گردد</p>
+          <p>با شماره موبایل وارد شده‌اید؛ مشخصات برای سفارش‌های بعدی ذخیره می‌شود</p>
         </div>
       </div>
 
@@ -117,7 +179,7 @@ export default function AccountPage() {
               <span className="acc-avatar">{initial ? initial : <Icon name="user" />}</span>
               <div>
                 <div className="acc-user-name">{name.trim() || "کاربر گرامی"}</div>
-                <div className="acc-user-sub">{phone.trim() || "شماره موبایل ثبت نشده"}</div>
+                <div className="acc-user-sub">{phone.trim() ? toFa(phone) : "شماره موبایل ثبت نشده"}</div>
               </div>
             </div>
 
@@ -133,6 +195,9 @@ export default function AccountPage() {
                   {t.label}
                 </button>
               ))}
+              <button type="button" className="acc-nav-btn" onClick={() => signOut({ callbackUrl: "/" })}>
+                <Icon name="close" /> خروج از حساب
+              </button>
             </nav>
 
             <div className="acc-side-links">
@@ -208,7 +273,7 @@ export default function AccountPage() {
                 {loaded && !orders.length ? (
                   <EmptyOrders />
                 ) : (
-                  orders.slice(0, 2).map((o, i) => <OrderCard key={i} order={o} />)
+                  orders.slice(0, 2).map((o) => <OrderCard key={o.id} order={o} onCancel={cancelOrder} />)
                 )}
               </div>
             )}
@@ -226,14 +291,8 @@ export default function AccountPage() {
                     </div>
                     <div>
                       <label htmlFor="a-phone">شماره موبایل</label>
-                      <input
-                        id="a-phone"
-                        dir="ltr"
-                        inputMode="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="0913xxxxxxx"
-                      />
+                      <input id="a-phone" className="auth-readonly" dir="ltr" value={phone} readOnly />
+                      <span className="hint">برای تغییر شماره باید دوباره با موبایل جدید وارد شوید</span>
                     </div>
                     <div>
                       <label htmlFor="a-address">آدرس پیش‌فرض</label>
@@ -257,12 +316,12 @@ export default function AccountPage() {
               <div>
                 <div className="acc-panel-head">
                   <h2>سفارش‌های من</h2>
-                  <p>{loaded ? `${faNum.format(orders.length)} سفارش ثبت‌شده روی این دستگاه` : ""}</p>
+                  <p>{loaded ? `${faNum.format(orders.length)} سفارش ثبت‌شده` : ""}</p>
                 </div>
                 {loaded && !orders.length ? (
                   <EmptyOrders />
                 ) : (
-                  orders.map((o, i) => <OrderCard key={i} order={o} />)
+                  orders.map((o) => <OrderCard key={o.id} order={o} onCancel={cancelOrder} />)
                 )}
               </div>
             )}
@@ -287,26 +346,26 @@ export default function AccountPage() {
 
                 <div className="acc-setting-row">
                   <div>
+                    <b>خروج از حساب</b>
+                    <span className="hint">از این دستگاه خارج می‌شوید؛ برای ورود دوباره به کد تایید نیاز دارید</span>
+                  </div>
+                  <button type="button" className="acc-danger-btn" onClick={() => signOut({ callbackUrl: "/" })}>
+                    خروج
+                  </button>
+                </div>
+
+                <div className="acc-setting-row">
+                  <div>
                     <b>پاک‌کردن اطلاعات پروفایل</b>
-                    <span className="hint">نام، شماره موبایل و آدرس پیش‌فرض ذخیره‌شده حذف می‌شود</span>
+                    <span className="hint">نام و آدرس پیش‌فرض حذف می‌شود؛ شماره موبایل حساب باقی می‌ماند</span>
                   </div>
                   <button type="button" className="acc-danger-btn" onClick={clearProfile}>
                     پاک‌کردن
                   </button>
                 </div>
 
-                <div className="acc-setting-row">
-                  <div>
-                    <b>پاک‌کردن تاریخچه سفارش‌ها</b>
-                    <span className="hint">سفارش‌های ثبت‌شده روی این دستگاه حذف می‌شود (سفارش‌های ثبت‌شده در فروشگاه تحت تاثیر قرار نمی‌گیرند)</span>
-                  </div>
-                  <button type="button" className="acc-danger-btn" onClick={clearOrders}>
-                    پاک‌کردن
-                  </button>
-                </div>
-
                 <p className="muted mt-2">
-                  اطلاعات حساب کاربری شما فقط روی همین دستگاه و مرورگر ذخیره می‌شود و به هیچ سروری ارسال نمی‌گردد.
+                  شماره موبایل هویت حساب شماست. نام و آدرس روی سرور ذخیره می‌شود تا در خریدهای بعدی تکمیل گردد.
                 </p>
               </div>
             )}
@@ -334,30 +393,42 @@ function EmptyOrders() {
   );
 }
 
-function OrderCard({ order: o }: { order: Order }) {
+function OrderCard({ order: o, onCancel }: { order: PublicOrder; onCancel: (no: string) => void }) {
+  const total = o.finalTotal ?? o.estimatedTotal;
   return (
     <div className="order-card">
       <div className="o-head">
-        <span className="o-total">{fmtPrice(o.total)} تومان</span>
-        <span className="o-badge">{o.day}</span>
+        <span className="o-total">
+          {fmtPrice(total)} تومان{o.hasWeightItems && !o.finalTotal ? " (تقریبی)" : ""}
+        </span>
+        <span className={`o-badge o-status-${o.status}`}>{ORDER_STATUS_LABEL[o.status]}</span>
       </div>
       <div className="o-date">
-        {orderDate(o)} — ساعت {o.slot}
+        <b className="o-no" dir="ltr">
+          {o.orderNo}
+        </b>
+        {" · "}
+        {orderDate(o)} — {dayLabel(o.day)} ساعت {slotLabel(o.slot)}
       </div>
       <div className="order-items-list">
-        {o.items.map((it, i) => (
-          <span key={i}>
-            {it.name} × {orderItemQty(it)}
+        {o.items.map((it) => (
+          <span key={it.productId}>
+            {it.name} × {qtyLabelBySale(it.sale, it.qty)}
           </span>
         ))}
       </div>
       <div className="muted" style={{ fontSize: ".75rem" }}>
-        پرداخت: {o.pay}
+        پرداخت: {PAY_METHOD_LABEL[o.paymentMethod]} — {PAY_STATUS_LABEL[o.paymentStatus]}
       </div>
       <div className="order-actions">
-        <button type="button" className="btn btn-sm btn-outline" onClick={() => trackOnWhatsapp(o)}>
+        <a className="btn btn-sm btn-outline" href={orderWhatsappUrl(o, "track")} target="_blank" rel="noopener">
           <Icon name="chat" /> پیگیری در واتس‌اپ
-        </button>
+        </a>
+        {o.status === "pending" ? (
+          <button type="button" className="acc-danger-btn" onClick={() => onCancel(o.orderNo)}>
+            لغو سفارش
+          </button>
+        ) : null}
       </div>
     </div>
   );

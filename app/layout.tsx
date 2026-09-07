@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Assistant } from "@/components/Assistant";
 import { VpnNotice } from "@/components/VpnNotice";
 import { TiltProvider } from "@/components/TiltProvider";
+import { AuthProvider } from "@/components/AuthProvider";
 import { ToastHost } from "@/lib/toast";
 
 export const metadata: Metadata = {
@@ -24,14 +25,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fa" dir="rtl">
       <body>
-        <Header />
-        {children}
-        <BottomNav />
-        <Footer />
-        <Assistant />
-        <VpnNotice />
-        <TiltProvider />
-        <ToastHost />
+        <AuthProvider>
+          <Header />
+          {children}
+          <BottomNav />
+          <Footer />
+          <Assistant />
+          <VpnNotice />
+          <TiltProvider />
+          <ToastHost />
+        </AuthProvider>
       </body>
     </html>
   );
