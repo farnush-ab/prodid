@@ -52,6 +52,12 @@ export const ICONS: Record<string, string> = {
   falafel: '<circle cx="8" cy="9" r="3.2"/><circle cx="16" cy="9" r="3.2"/><circle cx="12" cy="15.5" r="3.2"/>',
   wifi: '<path d="M2.5 8.5a15 15 0 0 1 19 0"/><path d="M5.5 12a11 11 0 0 1 13 0"/><path d="M8.5 15.5a6 6 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
   shield: '<path d="M12 3.5 19 6v5c0 4.5-3 8-7 9.5C8 19 5 15.5 5 11V6l7-2.5Z"/><path d="m9 11.5 2 2 4-4"/>',
+
+  /* ---- پنل مدیریت ---- */
+  bell: '<path d="M12 3.5a5 5 0 0 0-5 5v2.8c0 1-.4 2-1.1 2.7L5 15h14l-.9-.9a3.8 3.8 0 0 1-1.1-2.7V8.5a5 5 0 0 0-5-5Z"/><path d="M9.5 18.5a2.5 2.5 0 0 0 5 0"/>',
+  gear: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2.6M12 17.9v2.6M4.8 6.6l1.9 1.9M17.3 15.5l1.9 1.9M3.5 12h2.6M17.9 12h2.6M4.8 17.4l1.9-1.9M17.3 8.5l1.9-1.9"/>',
+  chart: '<path d="M4 17.5 9.5 12l3.5 3.5L20 8"/><path d="M14.5 8h5.5v5.5"/><path d="M4 20.5h16"/>',
+  users: '<circle cx="8.5" cy="8" r="3"/><path d="M3 20a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9.5" r="2.3"/><path d="M14.7 12a4.3 4.3 0 0 1 6.3 3.8"/>',
 };
 
 export function iconHTML(name: string, cls = ""): string {
