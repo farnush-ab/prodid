@@ -4,20 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-پرودید (Prodid) — a Persian/RTL e-commerce storefront (protein/food shop in Kashan, Iran) built with **Next.js 14 (App Router) + TypeScript + React 18**. It was migrated from a pure static HTML/CSS/JS site, preserving exact visual appearance and behavior. There is **no backend/API** — all persistence is client-side `localStorage`, and checkout is completed by handing off to WhatsApp (`wa.me` links), not a payment gateway.
+پرودید (Prodid) — a Persian/RTL e-commerce storefront (protein/food shop in Kashan, Iran) built with **Next.js 14 (App Router) + TypeScript + React 18**. It started as a pure static HTML/CSS/JS site migrated to Next.js with all persistence in `localStorage` and checkout handed off to WhatsApp (`wa.me` links). **A real backend has since been added on top of that**: phone/OTP login via NextAuth and order placement/history via MongoDB (see "Backend / auth / orders" below). Large parts of the UI (cart badges, product cards, guest checkout) still work purely client-side against `localStorage`, so both layers coexist — check whether the code you're touching predates or postdates the backend addition before assuming either model.
 
 ## Commands
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000
-npm run build        # production build; must emit static-prerendered routes for all pages
+npm run dev          # http://localhost:3000 — requires MongoDB reachable via MONGODB_URI (see .env.example) for auth/orders/account to work
+npm run build        # production build
 npm run start         # serve production build
 npm run lint          # next lint
 npx tsc --noEmit      # typecheck (no separate test suite exists)
 ```
 
-There is no automated test suite. Verification is: `npx tsc --noEmit` clean, `npm run build` succeeds with all routes statically prerendered, and manual/Playwright browser checks (zero console/hydration errors).
+Copy `.env.example` to `.env.local` and set `MONGODB_URI`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` before running `dev`/`build` — routes under `app/api/*` and `middleware.ts` need these. There is no automated test suite; verification is `npx tsc --noEmit` clean, `npm run build` succeeding, and manual/Playwright browser checks (zero console/hydration errors).
 
 ## Architecture
 
@@ -55,5 +55,11 @@ Products can be sold weighted (`sale: "w"`, price = per-kg, min order 100g / `MI
 ### Styling
 `app/globals.css` is a verbatim port of the original static site's `styles.css` (only asset URLs rewritten to `/assets/...`). Preserve this file's behavior exactly when touching it — e.g. a `prefers-reduced-motion` fallback for `.reveal` elements is currently overridden by a later "3D tilt" block; this is a pre-existing quirk from the original site and should not be "fixed" incidentally while doing unrelated work.
 
+### Backend / auth / orders
+- **Auth**: `lib/auth.ts` configures NextAuth with a single `phone-otp` Credentials provider (JWT sessions, 30-day maxAge). `app/login/page.tsx` + `components/LoginPanel.tsx` drive the flow: request OTP → `POST /api/auth/otp` (creates/updates an `Otp` doc, rate-limited by `lib/otp.ts`'s constants; **the code is currently only `console.log`'d server-side, not actually sent via SMS** — there is no SMS gateway wired up) → submit code → NextAuth `signIn("phone-otp", {phone, code})` → `authorize()` in `lib/auth.ts` verifies against the `Otp` collection and upserts a `User`. `middleware.ts` gates `/account` (via `withAuth`) so it requires a session. `lib/phone.ts` normalizes Iranian numbers (and Persian/Arabic digits) to `09xxxxxxxxx`.
+- **Orders**: `lib/order.ts` holds shared order types/enums/labels and builds the WhatsApp summary text (`orderWhatsappText`/`orderWhatsappUrl`) — WhatsApp handoff is still how the shop owner actually receives orders. `lib/order-server.ts` (server-only) validates and persists orders to MongoDB via the `Order`/`Counter`/`User` Mongoose models (`models/*.ts`), enforcing min order total (`BRAND.minOrder`), per-product weight/qty bounds, and a per-phone hourly rate limit. `app/api/orders/route.ts` (`GET` list-mine / `POST` create) and `app/api/orders/[no]/route.ts` (single order by `orderNo`, with `viewToken` for guest access without login) are the HTTP surface; `app/api/me/route.ts` reads/patches the logged-in user's profile.
+- **Payment**: `PAY_METHODS` in `lib/order.ts` includes `"online"`, which requires login (enforced in `createOrder`) and opens `components/PaymentSheet.tsx` in `components/AppModal.tsx` — this is a placeholder UI ("زرین‌پال به‌زودی وصل می‌شود"); no payment gateway is integrated yet, `paymentStatus` just stays `"unpaid"`.
+- `components/AuthProvider.tsx` wraps the root layout in NextAuth's `SessionProvider`. `app/account/page.tsx` now reads/writes account data through `/api/me` and `/api/orders` (server-backed) in addition to (or instead of) the older `lib/profile.ts` localStorage helpers — when editing account/checkout flows, check which of the two you're actually looking at, since both still exist in the codebase.
+
 ### Deployment
-Since this is now a Next.js app (not static output), it needs a Node.js host (e.g. Vercel) — GitHub Pages (used before the migration) no longer works.
+Since this is a Next.js app with a live database and auth (not static output), it needs a Node.js host with the env vars above configured (e.g. Vercel + a hosted MongoDB) — GitHub Pages (used before the original migration) does not work at all.
