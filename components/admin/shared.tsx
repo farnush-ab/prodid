@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/lib/icons";
 import type { OrderStatus, PayStatus } from "@/lib/order";
 import { ORDER_STATUS_LABEL, PAY_STATUS_LABEL } from "@/lib/order";
 
@@ -35,10 +36,18 @@ export function PayStatusPill({ status }: { status: PayStatus }) {
   );
 }
 
-export function EmptyRow({ colSpan, text }: { colSpan: number; text: string }) {
+export function EmptyRow({ colSpan, text, icon = "search" }: { colSpan: number; text: string; icon?: string }) {
   return (
-    <tr className="adm-empty-row">
-      <td colSpan={colSpan}>{text}</td>
+    <tr>
+      <td colSpan={colSpan} style={{ padding: 0 }}>
+        <div className="adm-empty">
+          <div className="e-ico">
+            <Icon name={icon} />
+          </div>
+          <b>{text}</b>
+          <p>می‌توانید عبارت جستجو یا فیلترها را تغییر دهید.</p>
+        </div>
+      </td>
     </tr>
   );
 }

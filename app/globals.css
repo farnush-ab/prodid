@@ -1851,13 +1851,18 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 .adm-nav-label { font-size: 0.66rem; color: var(--on-dark-2); padding: 0 10px 6px; letter-spacing: 0.03em; font-weight: 700; }
 .adm-nav-btn {
   width: 100%; display: flex; align-items: center; gap: 10px;
-  padding: 9px 10px; border-radius: 9px;
+  padding: 9px 10px; border-radius: 9px; position: relative;
   font-size: 0.83rem; font-weight: 500; color: var(--on-dark-2);
   transition: background 0.2s, color 0.2s; text-align: right;
 }
 .adm-nav-btn .ico { width: 17px; height: 17px; flex-shrink: 0; }
 .adm-nav-btn:hover { background: var(--espresso-800); color: var(--on-dark); }
+.adm-nav-btn:focus-visible { outline: 2px solid var(--brand-orange-light); outline-offset: -2px; }
 .adm-nav-btn.active { background: rgba(233, 118, 10, 0.16); color: var(--brand-orange-light); font-weight: 700; }
+.adm-nav-btn.active::before {
+  content: ""; position: absolute; inset-inline-start: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 999px; background: var(--brand-orange);
+}
 .adm-nav-btn .count {
   margin-inline-start: auto; font-size: 0.62rem; font-weight: 800;
   background: var(--danger); color: #fff; border-radius: 999px;
@@ -1885,8 +1890,14 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
   background: var(--bg-soft); align-items: center; justify-content: center; flex-shrink: 0;
 }
 .adm-search { position: relative; flex: 1; max-width: 380px; }
-.adm-search input { padding: 8px 14px 8px 14px; padding-inline-start: 34px; font-size: 0.82rem; }
+.adm-search input { padding: 8px 14px; padding-inline-start: 34px; padding-inline-end: 42px; font-size: 0.82rem; }
 .adm-search .ico { position: absolute; inset-inline-start: 11px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--ink-2); pointer-events: none; }
+.adm-search .kbd {
+  position: absolute; inset-inline-end: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 0.66rem; font-weight: 700; color: var(--ink-2); pointer-events: none;
+  border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; background: var(--surface);
+}
+.adm-search input:focus + .kbd, .adm-search input:not(:placeholder-shown) ~ .kbd { opacity: 0; }
 .adm-topbar-spacer { flex: 1; }
 .adm-icon-btn {
   position: relative; width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--line);
@@ -1933,24 +1944,42 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 
 .adm-toolbar { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .adm-toolbar input, .adm-toolbar select { padding: 8px 12px; font-size: 0.8rem; width: auto; }
-.adm-toolbar .grow { flex: 1; min-width: 180px; }
+.adm-toolbar .grow { flex: 1; min-width: 240px; }
+/* وقتی فیلترها زیادند، جستجو یک ردیف کامل بالا می‌ماند تا تنگ نشود */
+.adm-toolbar.stack { flex-direction: column; align-items: stretch; }
+.adm-toolbar.stack .grow { width: 100%; }
+.adm-toolbar.stack .grow input { width: 100%; }
 .adm-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .adm-chip {
+  display: inline-flex; align-items: center; gap: 6px;
   border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
   padding: 6px 13px; font-size: 0.76rem; font-weight: 700; color: var(--ink-2);
+  transition: background 0.18s var(--ease), color 0.18s var(--ease), border-color 0.18s var(--ease);
 }
+.adm-chip:hover { border-color: var(--wine-border); color: var(--espresso-800); }
 .adm-chip.active { background: var(--espresso-800); color: #fff; border-color: var(--espresso-800); }
+.adm-chip .n {
+  font-size: 0.68rem; font-weight: 800; min-width: 18px; padding: 0 5px;
+  border-radius: 999px; background: var(--bg-soft); color: var(--ink-2); line-height: 1.6;
+}
+.adm-chip.active .n { background: rgba(255, 255, 255, 0.18); color: #fff; }
 
 .adm-table-wrap { overflow-x: auto; }
 .adm-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
 .adm-table thead th {
   text-align: right; font-size: 0.68rem; color: var(--ink-2); font-weight: 800; letter-spacing: 0.02em;
   padding: 10px 18px; border-bottom: 1px solid var(--line); white-space: nowrap;
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
 }
 .adm-table tbody td { padding: 12px 18px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .adm-table tbody tr:last-child td { border-bottom: none; }
-.adm-table tbody tr.clickable { cursor: pointer; }
+.adm-table .amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm-table tbody tr.clickable { cursor: pointer; transition: background 0.15s var(--ease); }
 .adm-table tbody tr.clickable:hover { background: var(--bg-soft); }
+.adm-table tbody tr.clickable:focus-visible { outline: 2px solid var(--wine); outline-offset: -2px; background: var(--bg-soft); }
+/* اکشن سریع داخل ردیف — اصلی‌ترین کار روزمره است، پس همیشه دیده می‌شود و با هاور برجسته‌تر */
+.adm-quick { white-space: nowrap; }
+tr:hover .adm-quick { background: var(--brand-orange-tint); border-color: var(--brand-orange); }
 .adm-cell-main { font-weight: 700; color: var(--espresso-800); }
 .adm-cell-sub { font-size: 0.72rem; color: var(--ink-2); margin-top: 2px; }
 .adm-row-actions { display: flex; gap: 6px; justify-content: flex-end; }
@@ -1986,6 +2015,10 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 .adm-dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
 .adm-chart-wrap { position: relative; padding: 6px 2px 0; }
+.adm-axis-label {
+  position: absolute; inset-inline-end: 14px; transform: translateY(-140%);
+  font-size: 0.62rem; font-weight: 600; color: var(--ink-2); pointer-events: none; white-space: nowrap;
+}
 .adm-chart-tip {
   position: absolute; background: var(--espresso-950); color: var(--on-dark); font-size: 0.68rem; font-weight: 700;
   padding: 6px 9px; border-radius: 7px; pointer-events: none; opacity: 0; transition: opacity 0.1s; white-space: nowrap; z-index: 5;
@@ -1998,11 +2031,68 @@ label { font-weight: 500; font-size: 0.9rem; display: block; margin-bottom: 8px;
 .adm-bar-fill { height: 100%; border-radius: 999px; }
 .adm-bar-row .amt { width: 78px; flex-shrink: 0; text-align: left; font-size: 0.72rem; font-weight: 700; color: var(--ink-2); }
 
-.adm-attention-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line); text-align: right; width: 100%; }
-.adm-attention-row:last-child { border-bottom: none; }
-.adm-attention-row:hover { background: var(--bg-soft); }
-.adm-attention-row .txt { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; font-weight: 700; color: var(--espresso-800); }
-.adm-attention-row .ico { width: 18px; height: 18px; color: var(--wine); }
+/* ---- کارت آمار قابل‌کلیک (drill-down به بخش مربوطه) ---- */
+.adm-metric {
+  display: flex; align-items: flex-start; gap: 13px; width: 100%; text-align: right;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  padding: 16px 17px; position: relative;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease), transform 0.2s var(--ease);
+}
+button.adm-metric:hover { border-color: var(--wine-border); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+button.adm-metric:focus-visible { outline: 2px solid var(--wine); outline-offset: 2px; }
+button.adm-metric::after {
+  content: ""; position: absolute; inset-inline-start: 14px; top: 20px;
+  width: 7px; height: 7px; border-inline-start: 1.5px solid var(--ink-2); border-block-end: 1.5px solid var(--ink-2);
+  transform: rotate(45deg); opacity: 0; transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+}
+button.adm-metric:hover::after { opacity: 0.75; transform: rotate(45deg) translate(-2px, -2px); }
+.adm-metric .m-ico { width: 38px; height: 38px; flex-shrink: 0; border-radius: 11px; display: grid; place-items: center; }
+.adm-metric .m-ico .ico { width: 18px; height: 18px; }
+.adm-metric .m-body { min-width: 0; }
+.adm-metric .m-label { display: block; font-size: 0.73rem; font-weight: 600; color: var(--ink-2); margin-bottom: 5px; }
+.adm-metric .m-value { display: block; font-size: 1.22rem; font-weight: 900; color: var(--espresso-800); line-height: 1.25; font-variant-numeric: tabular-nums; }
+.adm-metric .m-value small { font-size: 0.7rem; font-weight: 700; color: var(--ink-2); margin-inline-start: 3px; }
+.adm-metric .m-delta { display: inline-flex; align-items: center; gap: 4px; margin-top: 7px; font-size: 0.68rem; font-weight: 700; }
+.adm-metric .m-delta.up { color: var(--brand-green-deep); }
+.adm-metric .m-delta.flat { color: var(--ink-2); }
+.adm-metric .m-delta.alert { color: var(--gold-deep); }
+
+/* ---- ردیف کار (صف کارهای امروز) ---- */
+.adm-task {
+  display: flex; align-items: center; gap: 12px; padding: 13px 18px; width: 100%; text-align: right;
+  border-bottom: 1px solid var(--line); transition: background 0.15s var(--ease);
+}
+.adm-task:last-child { border-bottom: none; }
+.adm-task:hover { background: var(--bg-soft); }
+.adm-task:focus-visible { outline: 2px solid var(--wine); outline-offset: -2px; }
+.adm-task .t-ico { width: 32px; height: 32px; flex-shrink: 0; border-radius: 9px; display: grid; place-items: center; }
+.adm-task .t-ico .ico { width: 16px; height: 16px; }
+.adm-task .t-body { flex: 1; min-width: 0; }
+.adm-task .t-title { display: block; font-size: 0.81rem; font-weight: 700; color: var(--espresso-800); }
+.adm-task .t-sub { display: block; font-size: 0.7rem; color: var(--ink-2); margin-top: 2px; }
+.adm-task .t-go { flex-shrink: 0; color: var(--ink-2); width: 16px; height: 16px; }
+
+/* ---- حالت خالی طراحی‌شده ---- */
+.adm-empty { text-align: center; padding: 44px 24px; }
+.adm-empty .e-ico {
+  width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 50%;
+  background: var(--bg-soft); color: var(--ink-2); display: grid; place-items: center;
+}
+.adm-empty .e-ico .ico { width: 24px; height: 24px; }
+.adm-empty b { display: block; font-size: 0.9rem; font-weight: 800; color: var(--espresso-800); margin-bottom: 5px; }
+.adm-empty p { font-size: 0.78rem; color: var(--ink-2); max-width: 34ch; margin: 0 auto; line-height: 1.8; }
+.adm-empty .btn { margin-top: 16px; }
+
+/* ---- سلسله‌مراتب اکشن‌های مودال ---- */
+.adm-actions { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+.adm-actions-row { display: flex; gap: 9px; }
+.adm-actions-row > * { flex: 1; }
+.adm-actions .adm-destructive {
+  background: none; color: var(--danger); font-size: 0.8rem; font-weight: 700;
+  padding: 9px; border-radius: var(--radius); margin-top: 2px;
+  border-top: 1px solid var(--line); border-radius: 0; padding-top: 14px;
+}
+.adm-actions .adm-destructive:hover { background: rgba(214, 69, 51, 0.06); }
 
 @media (max-width: 900px) {
   .adm-sidebar { position: fixed; inset-inline-start: 0; top: 0; transform: translateX(100%); transition: transform 0.2s; }

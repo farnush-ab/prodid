@@ -104,7 +104,7 @@ export function ProductsView({
                     </td>
                     <td>{catName(p.cat)}</td>
                     <td>{p.sale === "w" ? "وزنی (کیلو)" : "عددی (بسته)"}</td>
-                    <td>{p.price === null ? "استعلامی" : `${fmtPrice(p.price)} تومان`}</td>
+                    <td className="amount">{p.price === null ? "استعلامی" : `${fmtPrice(p.price)} تومان`}</td>
                     <td>{p.badge ? <span className="adm-pill adm-pill-progress">{p.badge}</span> : "—"}</td>
                     <td>
                       <label className="acc-switch">

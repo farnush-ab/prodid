@@ -20,6 +20,13 @@ const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
   preparing: "ارسال شد",
   delivering: "تحویل داده شد",
 };
+/* برچسب کوتاه برای دکمه داخل ردیف جدول */
+const QUICK_LABEL: Partial<Record<OrderStatus, string>> = {
+  pending: "تایید",
+  confirmed: "آماده‌سازی",
+  preparing: "ارسال شد",
+  delivering: "تحویل شد",
+};
 const STEPS: OrderStatus[] = ["pending", "confirmed", "preparing", "delivering", "delivered"];
 const FILTERS: { id: OrderStatus | "all"; label: string }[] = [
   { id: "all", label: "همه" },
@@ -33,18 +40,29 @@ const FILTERS: { id: OrderStatus | "all"; label: string }[] = [
 
 export function OrdersView({
   orders,
+  statusFilter,
+  onStatusFilter,
   onAdvance,
   onCancel,
   onMarkPaid,
 }: {
   orders: AdminOrder[];
+  statusFilter: OrderStatus | "all";
+  onStatusFilter: (s: OrderStatus | "all") => void;
   onAdvance: (orderNo: string) => void;
   onCancel: (orderNo: string) => void;
   onMarkPaid: (orderNo: string) => void;
 }) {
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [openOrderNo, setOpenOrderNo] = useState<string | null>(null);
+
+  const counts = useMemo(() => {
+    const map: Record<string, number> = { all: orders.length };
+    orders.forEach((o) => {
+      map[o.status] = (map[o.status] || 0) + 1;
+    });
+    return map;
+  }, [orders]);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -56,25 +74,27 @@ export function OrdersView({
   }, [orders, statusFilter, search]);
 
   const openOrder = orders.find((o) => o.orderNo === openOrderNo) || null;
+  const activeFilterLabel = FILTERS.find((f) => f.id === statusFilter)?.label;
 
   return (
     <div>
       <div className="adm-page-head">
         <div>
           <h1>سفارش‌ها</h1>
-          <p>مدیریت سفارش‌های ثبت‌شده از سایت، پیگیری وضعیت آماده‌سازی و ارسال، و هماهنگی با مشتری</p>
+          <p>سفارش‌ها را از همین‌جا تایید کنید و تا تحویل پیش ببرید — برای دیدن جزئیات روی هر ردیف بزنید</p>
         </div>
       </div>
 
       <div className="adm-card">
-        <div className="adm-toolbar">
+        <div className="adm-toolbar stack">
           <div className="grow">
             <input type="text" placeholder="جستجو با شماره سفارش، نام یا موبایل…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="adm-chips">
             {FILTERS.map((f) => (
-              <button key={f.id} type="button" className={`adm-chip${statusFilter === f.id ? " active" : ""}`} onClick={() => setStatusFilter(f.id)}>
+              <button key={f.id} type="button" className={`adm-chip${statusFilter === f.id ? " active" : ""}`} onClick={() => onStatusFilter(f.id)}>
                 {f.label}
+                <span className="n">{faNum.format(counts[f.id] || 0)}</span>
               </button>
             ))}
           </div>
@@ -90,12 +110,21 @@ export function OrdersView({
                 <th>پرداخت</th>
                 <th>تحویل</th>
                 <th>وضعیت</th>
+                <th>اقدام بعدی</th>
               </tr>
             </thead>
             <tbody>
               {rows.length ? (
                 rows.map((o) => (
-                  <tr key={o.orderNo} className="clickable" onClick={() => setOpenOrderNo(o.orderNo)}>
+                  <tr
+                    key={o.orderNo}
+                    className="clickable"
+                    tabIndex={0}
+                    onClick={() => setOpenOrderNo(o.orderNo)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") setOpenOrderNo(o.orderNo);
+                    }}
+                  >
                     <td>
                       <div className="adm-cell-main">{o.orderNo}</div>
                       <div className="adm-cell-sub">{o.createdLabel}</div>
@@ -105,7 +134,7 @@ export function OrdersView({
                       <div className="adm-cell-sub">{o.customer.phone}</div>
                     </td>
                     <td>{faNum.format(o.items.length)} قلم</td>
-                    <td>{fmtPrice(o.estimatedTotal)} تومان</td>
+                    <td className="amount">{fmtPrice(o.estimatedTotal)} تومان</td>
                     <td>
                       <PayStatusPill status={o.paymentStatus} />
                       <div className="adm-cell-sub">{PAY_METHOD_LABEL[o.paymentMethod]}</div>
@@ -117,10 +146,26 @@ export function OrdersView({
                     <td>
                       <StatusPill status={o.status} />
                     </td>
+                    <td>
+                      {NEXT_STATUS[o.status] ? (
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm adm-quick"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAdvance(o.orderNo);
+                          }}
+                        >
+                          <Icon name="check" /> {QUICK_LABEL[o.status]}
+                        </button>
+                      ) : (
+                        <span className="adm-cell-sub">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))
               ) : (
-                <EmptyRow colSpan={7} text="سفارشی با این مشخصات پیدا نشد" />
+                <EmptyRow colSpan={8} text={search ? "سفارشی با این مشخصات پیدا نشد" : `سفارشی در وضعیت «${activeFilterLabel}» وجود ندارد`} />
               )}
             </tbody>
           </table>
@@ -128,7 +173,7 @@ export function OrdersView({
       </div>
 
       {openOrder ? (
-        <AppModal title={openOrder.customer.name} subtitle={openOrder.orderNo} icon="package" onClose={() => setOpenOrderNo(null)}>
+        <AppModal title={openOrder.customer.name} subtitle={`${openOrder.orderNo} · ${openOrder.createdLabel}`} icon="package" onClose={() => setOpenOrderNo(null)}>
           {openOrder.status === "cancelled" ? (
             <span className="adm-pill adm-pill-danger" style={{ marginBottom: 14, display: "inline-flex" }}>
               این سفارش لغو شده است
@@ -160,9 +205,14 @@ export function OrdersView({
               </div>
             ))}
             <div className="adm-item-line" style={{ borderTop: "1px solid var(--line)", marginTop: 4, paddingTop: 10 }}>
-              <b>مبلغ کل</b>
-              <b>{fmtPrice(openOrder.estimatedTotal)} تومان</b>
+              <b>مبلغ کل{openOrder.hasWeightItems ? " (تقریبی)" : ""}</b>
+              <b className="amount">{fmtPrice(openOrder.estimatedTotal)} تومان</b>
             </div>
+            {openOrder.hasWeightItems ? (
+              <p className="hint" style={{ marginTop: 8 }}>
+                این سفارش قلم وزنی دارد؛ مبلغ نهایی پس از وزن‌کشی مشخص می‌شود.
+              </p>
+            ) : null}
           </div>
 
           <div className="adm-dgrid" style={{ marginBottom: 16 }}>
@@ -183,8 +233,14 @@ export function OrdersView({
               </div>
             </div>
             <div className="adm-dblock">
+              <label>موبایل</label>
+              <div className="val" dir="ltr" style={{ textAlign: "right" }}>
+                {openOrder.customer.phone}
+              </div>
+            </div>
+            <div className="adm-dblock" style={{ gridColumn: "1 / -1" }}>
               <label>آدرس</label>
-              <div className="val" style={{ fontWeight: 500, fontSize: "0.8rem" }}>
+              <div className="val" style={{ fontWeight: 500, fontSize: "0.8rem", lineHeight: 1.9 }}>
                 {openOrder.customer.address}
               </div>
             </div>
@@ -199,25 +255,31 @@ export function OrdersView({
             </div>
           ) : null}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="adm-actions">
             {openOrder.status !== "cancelled" && NEXT_STATUS[openOrder.status] ? (
-              <button type="button" className="btn btn-primary" onClick={() => onAdvance(openOrder.orderNo)}>
-                {NEXT_LABEL[openOrder.status]}
+              <button type="button" className="btn btn-primary btn-block" onClick={() => onAdvance(openOrder.orderNo)}>
+                <Icon name="check" /> {NEXT_LABEL[openOrder.status]}
               </button>
             ) : null}
-            {openOrder.paymentStatus === "unpaid" && openOrder.paymentMethod !== "cod" ? (
-              <button type="button" className="btn btn-outline" onClick={() => onMarkPaid(openOrder.orderNo)}>
-                <Icon name="check" /> ثبت پرداخت‌شده
-              </button>
-            ) : null}
-            <a className="btn btn-outline" href={orderWhatsappUrl(openOrder, "track")} target="_blank" rel="noreferrer">
-              <Icon name="chat" /> ارسال پیگیری در واتس‌اپ
-            </a>
+
+            <div className="adm-actions-row">
+              <a className="btn btn-outline btn-sm" href={orderWhatsappUrl(openOrder, "track")} target="_blank" rel="noreferrer">
+                <Icon name="chat" /> واتس‌اپ
+              </a>
+              <a className="btn btn-outline btn-sm" href={`tel:${openOrder.customer.phone}`}>
+                <Icon name="phone" /> تماس
+              </a>
+              {openOrder.paymentStatus === "unpaid" && openOrder.paymentMethod !== "cod" ? (
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => onMarkPaid(openOrder.orderNo)}>
+                  <Icon name="wallet" /> ثبت پرداخت
+                </button>
+              ) : null}
+            </div>
+
             {openOrder.status !== "cancelled" && openOrder.status !== "delivered" ? (
               <button
                 type="button"
-                className="btn"
-                style={{ background: "rgba(214,69,51,.1)", color: "var(--danger)" }}
+                className="adm-destructive"
                 onClick={() => {
                   onCancel(openOrder.orderNo);
                   setOpenOrderNo(null);

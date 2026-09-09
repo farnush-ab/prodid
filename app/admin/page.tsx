@@ -43,6 +43,9 @@ const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
 
 export default function AdminPage() {
   const [view, setView] = useState<AdminView>("dashboard");
+  /* فیلتر سفارش‌ها اینجا نگه داشته می‌شود تا کارت‌های داشبورد بتوانند مستقیم
+     وارد لیست سفارش‌ها با همان وضعیت شوند و با جابه‌جایی بین تب‌ها هم پاک نشود */
+  const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatus | "all">("all");
 
   const [orders, setOrders] = useState<AdminOrder[]>(() => ADMIN_ORDERS.map((o) => ({ ...o })));
   const [products, setProducts] = useState<(Product & { sold: number })[]>(() => cloneProducts());
@@ -162,26 +165,41 @@ export default function AdminPage() {
     toast(value ? "حالت تعمیر و نگهداری فعال شد" : "حالت تعمیر و نگهداری غیرفعال شد");
   }
 
+  function drillToOrders(status: OrderStatus | "all") {
+    setOrderStatusFilter(status);
+    setView("orders");
+  }
+
   function search(q: string) {
     const query = q.toLowerCase();
-    const hits: { id: string; label: string; view: AdminView }[] = [];
+    const hits: { id: string; label: string; kind: string; icon: string; view: AdminView }[] = [];
     orders.forEach((o) => {
       if (o.orderNo.toLowerCase().includes(query) || o.customer.name.toLowerCase().includes(query) || o.customer.phone.includes(query))
-        hits.push({ id: `o-${o.orderNo}`, label: `🧾 ${o.orderNo} — ${o.customer.name}`, view: "orders" });
+        hits.push({ id: `o-${o.orderNo}`, label: `${o.orderNo} — ${o.customer.name}`, kind: "سفارش", icon: "package", view: "orders" });
     });
     products.forEach((p) => {
-      if (p.name.toLowerCase().includes(query)) hits.push({ id: `p-${p.id}`, label: `📦 ${p.name}`, view: "products" });
+      if (p.name.toLowerCase().includes(query)) hits.push({ id: `p-${p.id}`, label: p.name, kind: "محصول", icon: "box", view: "products" });
     });
     customers.forEach((c) => {
-      if (c.name.toLowerCase().includes(query) || c.phone.includes(query)) hits.push({ id: `c-${c.phone}`, label: `👤 ${c.name} — ${c.phone}`, view: "customers" });
+      if (c.name.toLowerCase().includes(query) || c.phone.includes(query))
+        hits.push({ id: `c-${c.phone}`, label: `${c.name} — ${c.phone}`, kind: "مشتری", icon: "users", view: "customers" });
     });
     return hits;
   }
 
   return (
     <AdminShell active={view} onNavigate={setView} pendingOrders={pendingOrders} maintenanceOn={maintenanceOn} onSearch={search}>
-      {view === "dashboard" && <DashboardView orders={orders} products={products} onNavigate={setView} />}
-      {view === "orders" && <OrdersView orders={orders} onAdvance={advanceOrder} onCancel={cancelOrder} onMarkPaid={markOrderPaid} />}
+      {view === "dashboard" && <DashboardView orders={orders} products={products} onNavigate={setView} onDrillToOrders={drillToOrders} />}
+      {view === "orders" && (
+        <OrdersView
+          orders={orders}
+          statusFilter={orderStatusFilter}
+          onStatusFilter={setOrderStatusFilter}
+          onAdvance={advanceOrder}
+          onCancel={cancelOrder}
+          onMarkPaid={markOrderPaid}
+        />
+      )}
       {view === "payments" && <PaymentsView orders={orders} onMarkPaid={markOrderPaid} />}
       {view === "products" && (
         <ProductsView products={products} categories={categories} onSave={saveProduct} onDelete={deleteProduct} onToggleAvailable={toggleProductAvailable} />

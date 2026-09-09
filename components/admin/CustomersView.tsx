@@ -59,8 +59,8 @@ export function CustomersView({
                   <tr key={c.phone} className="clickable" onClick={() => setOpenPhone(c.phone)}>
                     <td className="adm-cell-main">{c.name}</td>
                     <td>{c.phone}</td>
-                    <td>{faNum.format(c.orders)}</td>
-                    <td>{fmtPrice(c.spent)} تومان</td>
+                    <td className="amount">{faNum.format(c.orders)}</td>
+                    <td className="amount">{fmtPrice(c.spent)} تومان</td>
                     <td>{c.last}</td>
                     <td>
                       {c.status === "active" ? <span className="adm-pill adm-pill-done">فعال</span> : <span className="adm-pill adm-pill-danger">مسدود</span>}
