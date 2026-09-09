@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Icon } from "@/lib/icons";
 import { fmtPrice, faNum } from "@/lib/format";
 import { PAY_METHOD_LABEL } from "@/lib/order";
 import type { AdminOrder } from "@/lib/admin-data";
@@ -26,30 +27,40 @@ export function PaymentsView({ orders, onMarkPaid }: { orders: AdminOrder[]; onM
       </div>
 
       <div className="adm-stat-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        <div className="acc-stat">
-          <span className="s-ico" style={{ background: "var(--gold-tint)", color: "var(--gold-deep)" }}>
-            ⏳
+        <div className="adm-metric">
+          <span className="m-ico" style={{ background: "var(--gold-tint)", color: "var(--gold-deep)" }}>
+            <Icon name="clock" />
           </span>
-          <div>
-            <b>{faNum.format(pending.length)}</b>
-            <span>در انتظار تایید پرداخت</span>
-          </div>
-        </div>
-        <div className="acc-stat">
-          <span className="s-ico">✓</span>
-          <div>
-            <b>{fmtPrice(paidToday)}</b>
-            <span>پرداخت‌شده امروز (تومان)</span>
-          </div>
-        </div>
-        <div className="acc-stat">
-          <span className="s-ico" style={{ background: "#eee9dd", color: "#8d8172" }}>
-            🔒
+          <span className="m-body">
+            <span className="m-label">در انتظار تایید پرداخت</span>
+            <span className="m-value">
+              {faNum.format(pending.length)}
+              <small>سفارش</small>
+            </span>
           </span>
-          <div>
-            <b style={{ fontSize: "0.95rem" }}>به‌زودی (زرین‌پال)</b>
-            <span>درگاه آنلاین</span>
-          </div>
+        </div>
+        <div className="adm-metric">
+          <span className="m-ico" style={{ background: "var(--brand-green-tint)", color: "var(--brand-green-deep)" }}>
+            <Icon name="check" />
+          </span>
+          <span className="m-body">
+            <span className="m-label">پرداخت‌شده امروز</span>
+            <span className="m-value">
+              {fmtPrice(paidToday)}
+              <small>تومان</small>
+            </span>
+          </span>
+        </div>
+        <div className="adm-metric">
+          <span className="m-ico" style={{ background: "#eee9dd", color: "#8d8172" }}>
+            <Icon name="shield" />
+          </span>
+          <span className="m-body">
+            <span className="m-label">درگاه آنلاین</span>
+            <span className="m-value" style={{ fontSize: "0.95rem" }}>
+              به‌زودی (زرین‌پال)
+            </span>
+          </span>
         </div>
       </div>
 
@@ -79,7 +90,7 @@ export function PaymentsView({ orders, onMarkPaid }: { orders: AdminOrder[]; onM
                     <td className="adm-cell-main">{o.orderNo}</td>
                     <td>{o.customer.name}</td>
                     <td>{PAY_METHOD_LABEL[o.paymentMethod]}</td>
-                    <td>{fmtPrice(o.estimatedTotal)} تومان</td>
+                    <td className="amount">{fmtPrice(o.estimatedTotal)} تومان</td>
                     <td className="adm-cell-sub">{o.createdLabel}</td>
                     <td>
                       <button type="button" className="btn btn-outline btn-sm" onClick={() => onMarkPaid(o.orderNo)}>

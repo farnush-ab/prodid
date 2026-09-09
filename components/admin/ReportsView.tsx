@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/lib/icons";
 import { fmtPrice, faNum } from "@/lib/format";
 import type { AdminOrder } from "@/lib/admin-data";
 import { REVENUE_SERIES } from "@/lib/admin-data";
@@ -13,10 +14,10 @@ export function ReportsView({ orders, products }: { orders: AdminOrder[]; produc
   const avgOrder = orders.reduce((s, o) => s + o.estimatedTotal, 0) / orders.length;
 
   const stats = [
-    { label: "فروش ۱۴ روز اخیر", value: `${fmtPrice(totalRevenue)} تومان` },
-    { label: "تعداد سفارش", value: faNum.format(orders.length) },
-    { label: "میانگین ارزش سفارش", value: `${fmtPrice(Math.round(avgOrder))} تومان` },
-    { label: "نرخ لغو سفارش", value: `${faNum.format(Math.round((cancelled / orders.length) * 100))}٪` },
+    { label: "فروش ۱۴ روز اخیر", value: fmtPrice(totalRevenue), unit: "تومان", icon: "wallet", bg: "var(--brand-green-tint)", fg: "var(--brand-green-deep)" },
+    { label: "تعداد سفارش", value: faNum.format(orders.length), unit: "سفارش", icon: "package", bg: "var(--wine-tint)", fg: "var(--wine)" },
+    { label: "میانگین ارزش سفارش", value: fmtPrice(Math.round(avgOrder)), unit: "تومان", icon: "chart", bg: "var(--brand-orange-tint)", fg: "var(--brand-orange-deep)" },
+    { label: "نرخ لغو سفارش", value: faNum.format(Math.round((cancelled / orders.length) * 100)), unit: "درصد", icon: "close", bg: "rgba(214, 69, 51, 0.1)", fg: "var(--danger)" },
   ];
 
   const weightedSold = products.filter((p) => p.sale === "w").reduce((s, p) => s + p.sold, 0);
@@ -37,9 +38,17 @@ export function ReportsView({ orders, products }: { orders: AdminOrder[]; produc
 
       <div className="adm-stat-grid">
         {stats.map((s) => (
-          <div className="acc-stat" key={s.label} style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
-            <span className="hint">{s.label}</span>
-            <b style={{ fontSize: "1.15rem" }}>{s.value}</b>
+          <div className="adm-metric" key={s.label}>
+            <span className="m-ico" style={{ background: s.bg, color: s.fg }}>
+              <Icon name={s.icon} />
+            </span>
+            <span className="m-body">
+              <span className="m-label">{s.label}</span>
+              <span className="m-value">
+                {s.value}
+                <small>{s.unit}</small>
+              </span>
+            </span>
           </div>
         ))}
       </div>
@@ -82,8 +91,8 @@ export function ReportsView({ orders, products }: { orders: AdminOrder[]; produc
                   <tr key={p.id}>
                     <td className="adm-cell-sub">{faNum.format(i + 1)}</td>
                     <td className="adm-cell-main">{p.name}</td>
-                    <td>{faNum.format(p.sold)}</td>
-                    <td>{fmtPrice(p.sold * (p.price || 200000))} تومان</td>
+                    <td className="amount">{faNum.format(p.sold)}</td>
+                    <td className="amount">{fmtPrice(p.sold * (p.price || 200000))} تومان</td>
                   </tr>
                 ))}
               </tbody>

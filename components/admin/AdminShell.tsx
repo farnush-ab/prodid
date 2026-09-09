@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { toast } from "@/lib/toast";
 
@@ -87,15 +87,36 @@ export function AdminShell({
   onNavigate: (v: AdminView) => void;
   pendingOrders: number;
   maintenanceOn: boolean;
-  onSearch?: (q: string) => { id: string; label: string; view: AdminView }[];
+  onSearch?: (q: string) => { id: string; label: string; kind: string; icon: string; view: AdminView }[];
   children: React.ReactNode;
 }) {
   const [navOpen, setNavOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const results = query.trim() && onSearch ? onSearch(query.trim()) : [];
+
+  /* «/» برای پرش به جستجو، Esc برای بستن آن — میان‌بر رایج پنل‌های مدیریتی */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (e.key === "Escape") {
+        setQuery("");
+        searchRef.current?.blur();
+        setBellOpen(false);
+        setProfileOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   function go(v: AdminView) {
     onNavigate(v);
@@ -161,27 +182,39 @@ export function AdminShell({
           <div className="adm-search">
             <Icon name="search" className="ico" />
             <input
+              ref={searchRef}
               type="text"
               placeholder="جستجوی سفارش، محصول یا مشتری…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onBlur={() => setTimeout(() => setQuery(""), 150)}
             />
-            {results.length > 0 ? (
+            <span className="kbd">/</span>
+            {query.trim() ? (
               <div className="adm-dropdown">
-                {results.slice(0, 7).map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    className="adm-dropdown-item"
-                    onMouseDown={() => {
-                      go(r.view);
-                      setQuery("");
-                    }}
-                  >
-                    {r.label}
-                  </button>
-                ))}
+                {results.length ? (
+                  results.slice(0, 7).map((r) => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      className="adm-dropdown-item"
+                      onMouseDown={() => {
+                        go(r.view);
+                        setQuery("");
+                      }}
+                    >
+                      <Icon name={r.icon} />
+                      <span>
+                        {r.label}
+                        <small>{r.kind}</small>
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="hint" style={{ padding: "14px 12px", margin: 0 }}>
+                    چیزی با «{query.trim()}» پیدا نشد
+                  </p>
+                )}
               </div>
             ) : null}
           </div>

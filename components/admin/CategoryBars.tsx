@@ -36,7 +36,7 @@ export function CategoryBars({ products }: { products: (Product & { sold: number
             <div className="adm-bar-track">
               <div className="adm-bar-fill" style={{ width: `${Math.round((value / max) * 100)}%`, background: color }} />
             </div>
-            <span className="amt">{fmtPrice(Math.round(value / 1000))}هزار</span>
+            <span className="amt">{fmtPrice(Math.round(value / 1000))} هزار</span>
           </div>
         );
       })}

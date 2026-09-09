@@ -5,6 +5,7 @@ import { fmtPrice, faNum } from "@/lib/format";
 import type { AdminOrder } from "@/lib/admin-data";
 import { REVENUE_SERIES, isCreatedToday } from "@/lib/admin-data";
 import type { Product } from "@/lib/data";
+import type { OrderStatus } from "@/lib/order";
 import type { AdminView } from "./AdminShell";
 import { StatusPill } from "./shared";
 import { RevenueChart } from "./RevenueChart";
@@ -14,55 +15,125 @@ export function DashboardView({
   orders,
   products,
   onNavigate,
+  onDrillToOrders,
 }: {
   orders: AdminOrder[];
   products: (Product & { sold: number })[];
   onNavigate: (v: AdminView) => void;
+  onDrillToOrders: (status: OrderStatus | "all") => void;
 }) {
   const pendingCount = orders.filter((o) => o.status === "pending").length;
+  const activeCount = orders.filter((o) => ["confirmed", "preparing", "delivering"].includes(o.status)).length;
   const todayOrders = orders.filter(isCreatedToday);
   const todayRevenue = todayOrders.filter((o) => o.status !== "cancelled").reduce((s, o) => s + o.estimatedTotal, 0);
   const unpaidCard = orders.filter((o) => o.paymentMethod !== "cod" && o.paymentStatus === "unpaid" && o.status !== "cancelled").length;
   const unavailable = products.filter((p) => !p.available).length;
 
-  const stats = [
-    { label: "فروش امروز", value: `${fmtPrice(todayRevenue)} تومان`, delta: "۱۲٪+ نسبت به دیروز", up: true, icon: "wallet" },
-    { label: "سفارش‌های امروز", value: faNum.format(todayOrders.length), delta: "۲+ نسبت به دیروز", up: true, icon: "package" },
-    { label: "در انتظار تایید", value: faNum.format(pendingCount), delta: "نیاز به بررسی", up: false, icon: "clock" },
-    { label: "مشتری جدید هفته", value: faNum.format(4), delta: "۱+ نسبت به هفته قبل", up: true, icon: "users" },
+  const metrics = [
+    {
+      label: "فروش امروز",
+      value: fmtPrice(todayRevenue),
+      unit: "تومان",
+      delta: "۱۲٪+ نسبت به دیروز",
+      tone: "up" as const,
+      icon: "wallet",
+      bg: "var(--brand-green-tint)",
+      fg: "var(--brand-green-deep)",
+      go: () => onNavigate("reports"),
+    },
+    {
+      label: "سفارش‌های امروز",
+      value: faNum.format(todayOrders.length),
+      unit: "سفارش",
+      delta: "۲+ نسبت به دیروز",
+      tone: "up" as const,
+      icon: "package",
+      bg: "var(--wine-tint)",
+      fg: "var(--wine)",
+      go: () => onDrillToOrders("all"),
+    },
+    {
+      label: "در انتظار تایید",
+      value: faNum.format(pendingCount),
+      unit: "سفارش",
+      delta: pendingCount ? "نیاز به بررسی" : "چیزی معطل نمانده",
+      tone: pendingCount ? ("alert" as const) : ("flat" as const),
+      icon: "clock",
+      bg: "var(--gold-tint)",
+      fg: "var(--gold-deep)",
+      go: () => onDrillToOrders("pending"),
+    },
+    {
+      label: "در جریان ارسال",
+      value: faNum.format(activeCount),
+      unit: "سفارش",
+      delta: "تایید تا تحویل",
+      tone: "flat" as const,
+      icon: "truck",
+      bg: "var(--brand-orange-tint)",
+      fg: "var(--brand-orange-deep)",
+      go: () => onDrillToOrders("preparing"),
+    },
   ];
 
-  const attention: { icon: string; text: string; view: AdminView }[] = [];
-  if (pendingCount) attention.push({ icon: "package", text: `${faNum.format(pendingCount)} سفارش در انتظار تایید است`, view: "orders" });
-  if (unpaidCard) attention.push({ icon: "wallet", text: `${faNum.format(unpaidCard)} پرداخت کارت‌به‌کارت در انتظار تایید`, view: "payments" });
-  if (unavailable) attention.push({ icon: "box", text: `${faNum.format(unavailable)} محصول ناموجود است`, view: "products" });
+  const tasks: { icon: string; bg: string; fg: string; title: string; sub: string; go: () => void }[] = [];
+  if (pendingCount)
+    tasks.push({
+      icon: "package",
+      bg: "var(--gold-tint)",
+      fg: "var(--gold-deep)",
+      title: `${faNum.format(pendingCount)} سفارش منتظر تایید شماست`,
+      sub: "تا تایید نشوند وارد مرحله آماده‌سازی نمی‌شوند",
+      go: () => onDrillToOrders("pending"),
+    });
+  if (unpaidCard)
+    tasks.push({
+      icon: "wallet",
+      bg: "var(--wine-tint)",
+      fg: "var(--wine)",
+      title: `${faNum.format(unpaidCard)} پرداخت در انتظار تایید دستی`,
+      sub: "کارت‌به‌کارت باید بعد از دیدن رسید تایید شود",
+      go: () => onNavigate("payments"),
+    });
+  if (unavailable)
+    tasks.push({
+      icon: "box",
+      bg: "rgba(214, 69, 51, 0.1)",
+      fg: "var(--danger)",
+      title: `${faNum.format(unavailable)} محصول ناموجود است`,
+      sub: "در فروشگاه به مشتری نمایش داده نمی‌شود",
+      go: () => onNavigate("products"),
+    });
 
   return (
     <div>
       <div className="adm-page-head">
         <div>
           <h1>سلام عاطفه‌جان 👋</h1>
-          <p>خلاصه فعالیت فروشگاه پرودید امروز</p>
+          <p>خلاصه امروز فروشگاه پرودید — از هر کارت می‌توانید مستقیم وارد همان بخش شوید</p>
         </div>
         <button type="button" className="btn btn-outline btn-sm" onClick={() => onNavigate("reports")}>
-          مشاهده گزارش کامل
+          <Icon name="chart" /> گزارش کامل
         </button>
       </div>
 
       <div className="adm-stat-grid">
-        {stats.map((s) => (
-          <div className="acc-stat" key={s.label}>
-            <span className="s-ico" style={{ background: "var(--wine-tint)", color: "var(--wine)" }}>
-              <Icon name={s.icon} />
+        {metrics.map((m) => (
+          <button type="button" className="adm-metric" key={m.label} onClick={m.go}>
+            <span className="m-ico" style={{ background: m.bg, color: m.fg }}>
+              <Icon name={m.icon} />
             </span>
-            <div>
-              <b>{s.value}</b>
-              <span>{s.label}</span>
-              <span style={{ display: "block", marginTop: 4, fontSize: "0.7rem", fontWeight: 700, color: s.up ? "var(--brand-green-deep)" : "var(--gold-deep)" }}>
-                {s.up ? "▲" : "●"} {s.delta}
+            <span className="m-body">
+              <span className="m-label">{m.label}</span>
+              <span className="m-value">
+                {m.value}
+                <small>{m.unit}</small>
               </span>
-            </div>
-          </div>
+              <span className={`m-delta ${m.tone}`}>
+                {m.tone === "up" ? "▲" : m.tone === "alert" ? "●" : "—"} {m.delta}
+              </span>
+            </span>
+          </button>
         ))}
       </div>
 
@@ -79,24 +150,35 @@ export function DashboardView({
           </div>
           <RevenueChart data={REVENUE_SERIES} />
         </div>
+
         <div className="adm-card">
           <div className="adm-card-head">
-            <h3>نیازمند توجه</h3>
+            <div>
+              <h3>کارهای امروز</h3>
+              <div className="sub">{tasks.length ? `${faNum.format(tasks.length)} مورد نیاز به رسیدگی دارد` : "همه‌چیز رسیدگی شده"}</div>
+            </div>
           </div>
-          {attention.length ? (
-            attention.map((a, i) => (
-              <button type="button" className="adm-attention-row" key={i} onClick={() => onNavigate(a.view)}>
-                <span className="txt">
-                  <Icon name={a.icon} className="ico" />
-                  {a.text}
+          {tasks.length ? (
+            tasks.map((t, i) => (
+              <button type="button" className="adm-task" key={i} onClick={t.go}>
+                <span className="t-ico" style={{ background: t.bg, color: t.fg }}>
+                  <Icon name={t.icon} />
                 </span>
-                <Icon name="chevron" className="ico" />
+                <span className="t-body">
+                  <span className="t-title">{t.title}</span>
+                  <span className="t-sub">{t.sub}</span>
+                </span>
+                <Icon name="chevron" className="t-go" />
               </button>
             ))
           ) : (
-            <p className="adm-card-pad" style={{ color: "var(--ink-2)", fontSize: "0.82rem" }}>
-              همه‌چیز مرتب است ✨
-            </p>
+            <div className="adm-empty">
+              <div className="e-ico">
+                <Icon name="check" />
+              </div>
+              <b>کارها تمام شد</b>
+              <p>سفارش معطل، پرداخت تاییدنشده و محصول ناموجودی وجود ندارد.</p>
+            </div>
           )}
         </div>
       </div>
@@ -108,20 +190,20 @@ export function DashboardView({
               <h3>سفارش‌های اخیر</h3>
               <div className="sub">۵ سفارش آخر ثبت‌شده</div>
             </div>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onNavigate("orders")}>
-              مشاهده همه
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onDrillToOrders("all")}>
+              مشاهده همه <Icon name="chevron" />
             </button>
           </div>
           <div className="adm-table-wrap">
             <table className="adm-table">
               <tbody>
                 {orders.slice(0, 5).map((o) => (
-                  <tr key={o.orderNo}>
+                  <tr key={o.orderNo} className="clickable" tabIndex={0} onClick={() => onDrillToOrders("all")}>
                     <td>
                       <div className="adm-cell-main">{o.orderNo}</div>
                       <div className="adm-cell-sub">{o.customer.name}</div>
                     </td>
-                    <td>{fmtPrice(o.estimatedTotal)} تومان</td>
+                    <td className="amount">{fmtPrice(o.estimatedTotal)} تومان</td>
                     <td>
                       <StatusPill status={o.status} />
                     </td>
@@ -133,7 +215,10 @@ export function DashboardView({
         </div>
         <div className="adm-card">
           <div className="adm-card-head">
-            <h3>فروش به تفکیک دسته</h3>
+            <div>
+              <h3>فروش به تفکیک دسته</h3>
+              <div className="sub">۳۰ روز اخیر</div>
+            </div>
           </div>
           <CategoryBars products={products} />
         </div>
