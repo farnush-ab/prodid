@@ -4,12 +4,14 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Icon } from "@/lib/icons";
-import { getProduct, getCategory, PRODUCTS, BRAND, type Product } from "@/lib/data";
+import type { Product } from "@/lib/data";
 import { fmtPrice, toFa, parseIntFa, qtyLabel } from "@/lib/format";
 import { pageHref } from "@/lib/page";
 import { Cart, useCart, cartQty, step } from "@/lib/cart";
 import { toast } from "@/lib/toast";
 import { ProductCard } from "@/components/ProductCard";
+import { useCatalog } from "@/lib/catalog-store";
+import { productImageSrc } from "@/lib/product-image";
 
 const WEIGHT_CHIPS = [250, 500, 1000];
 
@@ -125,6 +127,14 @@ function WeightControl({ p, inCart }: { p: Product; inCart: number }) {
 
 function ProductAction({ p }: { p: Product }) {
   const inCart = cartQty(useCart(), p.id);
+  const { brand, features } = useCatalog();
+  if (features.maintenance) {
+    return (
+      <button className="btn btn-block" disabled style={{ background: "#eee9dd", color: "#a39a89" }}>
+        فروشگاه در حال به‌روزرسانی است
+      </button>
+    );
+  }
   if (!p.available) {
     return (
       <button className="btn btn-block" disabled style={{ background: "#eee9dd", color: "#a39a89" }}>
@@ -134,7 +144,7 @@ function ProductAction({ p }: { p: Product }) {
   }
   if (p.price === null) {
     return (
-      <a className="btn btn-primary btn-block" href={`tel:${BRAND.phone}`}>
+      <a className="btn btn-primary btn-block" href={`tel:${brand.phone}`}>
         <Icon name="phone" /> تماس برای سفارش
       </a>
     );
@@ -174,7 +184,8 @@ function ProductAction({ p }: { p: Product }) {
 
 function ProductContent() {
   const id = useSearchParams()?.get("id");
-  const p = getProduct(id);
+  const { products, categories, brand } = useCatalog();
+  const p = products.find((x) => x.id === id);
 
   useEffect(() => {
     if (p) document.title = `${p.name} | پرودید`;
@@ -198,14 +209,14 @@ function ProductContent() {
     );
   }
 
-  const cat = getCategory(p.cat)!;
-  const related = PRODUCTS.filter((x) => x.cat === p.cat && x.id !== p.id).slice(0, 4);
+  const cat = categories.find((c) => c.id === p.cat);
+  const related = products.filter((x) => x.cat === p.cat && x.id !== p.id).slice(0, 4);
 
   return (
     <main className="container mt-2">
       <nav className="breadcrumb" aria-label="مسیر">
         <Link href={pageHref("index")}>خانه</Link> ‹ <Link href={pageHref("shop")}>فروشگاه</Link> ‹{" "}
-        <Link href={`${pageHref("shop")}?cat=${p.cat}`}>{cat.name}</Link> ‹ {p.name}
+        <Link href={`${pageHref("shop")}?cat=${p.cat}`}>{cat?.name || p.cat}</Link> ‹ {p.name}
       </nav>
       <div className="product-layout">
         <div className="product-gallery">
@@ -229,7 +240,7 @@ function ProductContent() {
               </span>
             )}
             <span className="badge" style={{ background: "var(--wine-tint)", color: "var(--wine)" }}>
-              {cat.name}
+              {cat?.name || p.cat}
             </span>
           </div>
           <h1>{p.name}</h1>
@@ -259,8 +270,8 @@ function ProductContent() {
                 <Icon name="phone" />
                 <span>
                   قیمت این محصول روزانه تغییر می‌کند؛ برای استعلام و سفارش با{" "}
-                  <a href={`tel:${BRAND.phone}`} className="num">
-                    <b>{toFa(BRAND.phone)}</b>
+                  <a href={`tel:${brand.phone}`} className="num">
+                    <b>{toFa(brand.phone)}</b>
                   </a>{" "}
                   تماس بگیرید.
                 </span>
@@ -268,7 +279,7 @@ function ProductContent() {
             ) : null}
           </div>
           <ProductAction p={p} />
-          <a className="btn btn-outline btn-block mt-2" href={`tel:${BRAND.phone}`}>
+          <a className="btn btn-outline btn-block mt-2" href={`tel:${brand.phone}`}>
             <Icon name="headset" /> سوال دارید؟ تماس بگیرید
           </a>
         </div>
@@ -288,9 +299,13 @@ function ProductContent() {
 }
 
 function ProductGalleryImg({ p }: { p: Product }) {
+  const src = productImageSrc(p);
   const [ok, setOk] = useState(true);
+  useEffect(() => {
+    setOk(true);
+  }, [src]);
   if (!ok) return null;
-  return <img src={`/assets/img/products/${p.id}.jpg`} alt={p.name} onError={() => setOk(false)} />;
+  return <img src={src} alt={p.name} onError={() => setOk(false)} />;
 }
 
 export default function ProductPage() {

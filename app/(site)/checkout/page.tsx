@@ -5,37 +5,43 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Icon } from "@/lib/icons";
-import { BRAND } from "@/lib/data";
-import { fmtPrice, qtyLabel } from "@/lib/format";
-import { pageHref } from "@/lib/page";
-import { Cart, useCart, cartItems, cartTotal, cartHasWeightItems } from "@/lib/cart";
-import { Profile } from "@/lib/profile";
-import { toast } from "@/lib/toast";
-import { normalizePhone } from "@/lib/phone";
-import { AppModal } from "@/components/AppModal";
-import { LoginPanel } from "@/components/LoginPanel";
-import { PaymentSheet } from "@/components/PaymentSheet";
+import { useCatalog } from "@/lib/catalog-store";
 import {
-  DELIVERY_DAYS,
-  DELIVERY_SLOTS,
   LAST_ORDER_KEY,
   PAY_METHODS,
+  canPayOnlineOrder,
   dayLabel,
   orderWhatsappUrl,
   slotLabel,
   type PayMethod,
   type PublicOrder,
 } from "@/lib/order";
+import { requestZarinpalCheckout } from "@/lib/zarinpal-client";
+import { fmtPrice, qtyLabel } from "@/lib/format";
+import { pageHref } from "@/lib/page";
+import { Cart, useCart, cartItems, cartTotal, cartHasWeightItems } from "@/lib/cart";
+import { Profile } from "@/lib/profile";
+import { toast } from "@/lib/toast";
+import { normalizePhone } from "@/lib/phone";
+import { couponDiscountAmount, COUPON_KIND_LABEL, type CouponOffer } from "@/lib/coupon";
+import { AppModal } from "@/components/AppModal";
+import { LoginPanel } from "@/components/LoginPanel";
+import { PaymentSheet } from "@/components/PaymentSheet";
 
-function SuccessBox({ order }: { order: PublicOrder | null }) {
+function SuccessBox({ order, paid }: { order: PublicOrder | null; paid?: boolean }) {
+  const onlinePaid = paid || order?.paymentStatus === "paid";
   if (!order) {
     return (
       <div className="success-box">
         <div className="s-ico">
           <Icon name="check" />
         </div>
-        <h2>سفارش شما ثبت شد!</h2>
-        <p>جزئیات سفارش برای فروشگاه ارسال شد. همکاران ما به‌زودی برای تایید نهایی با شما تماس می‌گیرند.</p>
+        <h2>{onlinePaid ? "پرداخت انجام شد" : "سفارش شما ثبت شد!"}</h2>
+        <p>
+          {onlinePaid
+            ? "پرداخت آنلاین تایید شد. همکاران ما به‌زودی سفارش را بررسی می‌کنند."
+            : "جزئیات سفارش برای فروشگاه ارسال شد. همکاران ما به‌زودی برای تایید نهایی با شما تماس می‌گیرند."}
+        </p>
         <Link className="btn btn-primary btn-block" href={pageHref("shop")}>
           بازگشت به فروشگاه
         </Link>
@@ -51,11 +57,16 @@ function SuccessBox({ order }: { order: PublicOrder | null }) {
       <div className="s-ico">
         <Icon name="check" />
       </div>
-      <h2>سفارش شما ثبت شد!</h2>
+      <h2>{onlinePaid && order.paymentMethod === "online" ? "پرداخت انجام شد" : "سفارش شما ثبت شد!"}</h2>
       <p>
         شماره سفارش <b className="num" dir="ltr">{order.orderNo}</b>
         {order.hasWeightItems ? " — مبلغ نهایی محصولات وزنی پس از وزن‌کشی اعلام می‌شود." : ""}
       </p>
+      {order.paymentMethod === "online" ? (
+        <p className="muted" style={{ marginTop: "-12px" }}>
+          {onlinePaid ? "پرداخت آنلاین با موفقیت تایید شد." : "سفارش ثبت شده؛ پرداخت هنوز تکمیل نشده است."}
+        </p>
+      ) : null}
       <p className="muted" style={{ marginTop: "-12px" }}>
         {dayLabel(order.day)} — ساعت {slotLabel(order.slot)}
       </p>
@@ -76,20 +87,30 @@ function CheckoutForm() {
   const cart = useCart();
   const router = useRouter();
   const { data: session } = useSession();
+  const { brand, features, delivery } = useCatalog();
   const items = cartItems(cart);
   const total = cartTotal(cart);
-  const underMin = total < BRAND.minOrder;
+  const underMin = total < brand.minOrder;
+  const days = delivery.days.filter((d) => d.enabled);
+  const slots = delivery.slots.filter((s) => s.enabled);
+  const payMethods = PAY_METHODS.filter((m) => m.id !== "online" || features.onlinePay);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const [day, setDay] = useState<(typeof DELIVERY_DAYS)[number]["id"]>("today");
-  const [slot, setSlot] = useState<(typeof DELIVERY_SLOTS)[number]["id"]>(DELIVERY_SLOTS[0].id);
+  const [day, setDay] = useState(days[0]?.id || "today");
+  const [slot, setSlot] = useState(slots[0]?.id || "9-12");
   const [pay, setPay] = useState<PayMethod>("card");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [modal, setModal] = useState<null | "login" | "pay">(null);
   const loginNext = useRef<"stay" | "pay">("stay");
+  const [couponInput, setCouponInput] = useState("");
+  const [applied, setApplied] = useState<CouponOffer | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+  const [offers, setOffers] = useState<CouponOffer[]>([]);
+  const discount = applied ? couponDiscountAmount(total, applied.percent) : 0;
+  const payable = Math.max(0, total - discount);
 
   useEffect(() => {
     const local = Profile.read();
@@ -119,6 +140,47 @@ function CheckoutForm() {
       cancelled = true;
     };
   }, [session]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/coupons");
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok) setOffers(Array.isArray(data.coupons) ? data.coupons : []);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
+
+  async function applyCoupon(code: string) {
+    const raw = code.trim();
+    if (!raw || couponBusy) return;
+    setCouponBusy(true);
+    try {
+      const res = await fetch("/api/coupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: raw, phone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data.error || "کد تخفیف اعمال نشد");
+        return;
+      }
+      setApplied(data.coupon);
+      setCouponInput(data.coupon.code);
+      toast(`${data.coupon.percent} درصد تخفیف اعمال شد`);
+    } catch {
+      toast("بررسی کد تخفیف انجام نشد");
+    } finally {
+      setCouponBusy(false);
+    }
+  }
 
   if (!items.length) {
     return (
@@ -175,6 +237,7 @@ function CheckoutForm() {
           slot,
           pay,
           notes,
+          couponCode: applied?.code,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -198,6 +261,52 @@ function CheckoutForm() {
     } catch {
       toast("ارتباط با سرور برقرار نشد");
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function startOnlinePayment() {
+    if (busy) return;
+    const n = name.trim();
+    const ph = normalizePhone(phone);
+    const addr = address.trim();
+    if (!n || !ph || !addr) {
+      toast("لطفا نام، موبایل و آدرس را کامل کنید");
+      return;
+    }
+    if (underMin) {
+      toast("مبلغ سفارش به حداقل نرسیده است");
+      return;
+    }
+    if (!session?.user) {
+      loginNext.current = "pay";
+      setModal("login");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { paymentUrl, order } = await requestZarinpalCheckout({
+        items: items.map(({ p, qty }) => ({ id: p.id, qty })),
+        name: n,
+        phone: ph,
+        address: addr,
+        day,
+        slot,
+        pay: "online",
+        notes,
+        couponCode: applied?.code,
+      });
+      Profile.write({ name: n, phone: ph, address: addr });
+      try {
+        sessionStorage.setItem(LAST_ORDER_KEY, JSON.stringify(order));
+      } catch {
+        /* ignore */
+      }
+      Cart.clear();
+      window.location.href = paymentUrl;
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "اتصال به درگاه انجام نشد");
       setBusy(false);
     }
   }
@@ -249,7 +358,7 @@ function CheckoutForm() {
 
         <div className="form-card">
           <h3>
-            <span className="step-num">۲</span> آدرس تحویل (فقط {BRAND.city})
+            <span className="step-num">۲</span> آدرس تحویل (فقط {brand.city})
           </h3>
           <div className="form-grid">
             <div>
@@ -265,8 +374,18 @@ function CheckoutForm() {
             </div>
           </div>
           <p className="muted mt-1">
-            ارسال فقط در محدوده شهر {BRAND.city} انجام می‌شود؛ {BRAND.deliveryFeeNote}.
+            ارسال فقط در محدوده شهر {brand.city} انجام می‌شود؛ {brand.deliveryFeeNote}.
           </p>
+          {delivery.zones.length ? (
+            <ul className="muted mt-1" style={{ paddingInlineStart: 18 }}>
+              {delivery.zones.map((z) => (
+                <li key={z.name}>
+                  {z.name}
+                  {z.fee ? ` — ${fmtPrice(z.fee)} تومان` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
 
         <div className="form-card">
@@ -276,8 +395,8 @@ function CheckoutForm() {
           <div className="form-grid cols-2 mb-2">
             <div>
               <label htmlFor="f-day">روز تحویل</label>
-              <select id="f-day" value={day} onChange={(e) => setDay(e.target.value as typeof day)}>
-                {DELIVERY_DAYS.map((d) => (
+              <select id="f-day" value={day} onChange={(e) => setDay(e.target.value)}>
+                {days.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.label}
                   </option>
@@ -287,7 +406,7 @@ function CheckoutForm() {
           </div>
           <label>بازه زمانی</label>
           <div className="slot-grid">
-            {DELIVERY_SLOTS.map((s) => (
+            {slots.map((s) => (
               <button
                 key={s.id}
                 type="button"
@@ -304,7 +423,7 @@ function CheckoutForm() {
           <h3>
             <span className="step-num">۴</span> روش پرداخت
           </h3>
-          {PAY_METHODS.map((m) => (
+          {payMethods.map((m) => (
             <label className="pay-option" key={m.id}>
               <input type="radio" name="pay" value={m.id} checked={pay === m.id} onChange={() => setPay(m.id)} />
               <span>
@@ -344,6 +463,55 @@ function CheckoutForm() {
           <span>جمع کل{cartHasWeightItems(cart) ? " (تقریبی)" : ""}</span>
           <span>{fmtPrice(total)} تومان</span>
         </div>
+        <div className="coupon-box">
+          <label htmlFor="f-coupon">کد تخفیف</label>
+          {applied ? (
+            <div className="coupon-applied">
+              <span>
+                {applied.code} — {applied.percent}٪ {COUPON_KIND_LABEL[applied.kind]}
+              </span>
+              <button type="button" className="section-link" onClick={() => setApplied(null)}>
+                حذف
+              </button>
+            </div>
+          ) : (
+            <div className="coupon-row">
+              <input
+                id="f-coupon"
+                dir="ltr"
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value)}
+                placeholder="مثلا SAVE10"
+              />
+              <button type="button" className="btn btn-light btn-sm" disabled={couponBusy || !couponInput.trim()} onClick={() => applyCoupon(couponInput)}>
+                {couponBusy ? "…" : "اعمال"}
+              </button>
+            </div>
+          )}
+          {offers.filter((o) => o.eligible && o.code !== applied?.code).length ? (
+            <div className="coupon-chips">
+              {offers
+                .filter((o) => o.eligible && o.code !== applied?.code)
+                .map((o) => (
+                  <button type="button" key={o.code} className="slot" onClick={() => applyCoupon(o.code)}>
+                    {o.code} · {o.percent}٪
+                  </button>
+                ))}
+            </div>
+          ) : null}
+        </div>
+        {applied && discount ? (
+          <div className="sum-row discount">
+            <span>تخفیف {applied.percent}٪</span>
+            <span>−{fmtPrice(discount)} تومان</span>
+          </div>
+        ) : null}
+        {applied ? (
+          <div className="sum-row total">
+            <span>قابل پرداخت</span>
+            <span>{fmtPrice(payable)} تومان</span>
+          </div>
+        ) : null}
         {cartHasWeightItems(cart) ? (
           <p className="sum-note">
             <Icon name="scale" />
@@ -352,19 +520,22 @@ function CheckoutForm() {
         ) : null}
         <p className="sum-note">
           <Icon name="truck" />
-          <span>{BRAND.deliveryFeeNote}.</span>
+          <span>{brand.deliveryFeeNote}.</span>
         </p>
+        {features.maintenance ? (
+          <p className="min-order-warn">فروشگاه موقتاً در حال به‌روزرسانی است؛ ثبت سفارش اینترنتی ممکن نیست.</p>
+        ) : null}
         {underMin ? (
           <p className="min-order-warn">
-            حداقل مبلغ سفارش {fmtPrice(BRAND.minOrder)} تومان است. {fmtPrice(BRAND.minOrder - total)} تومان دیگر به سبد
+            حداقل مبلغ سفارش {fmtPrice(brand.minOrder)} تومان است. {fmtPrice(brand.minOrder - total)} تومان دیگر به سبد
             اضافه کنید.
           </p>
         ) : null}
-        <button type="submit" className="btn btn-primary btn-block" disabled={busy || underMin}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={busy || underMin || features.maintenance}>
           <Icon name={pay === "online" ? "card" : "check"} />{" "}
           {busy ? "در حال ثبت…" : pay === "online" ? "ادامه و پرداخت" : "ثبت سفارش"}
         </button>
-        <a className="btn btn-outline btn-block mt-1" href={`tel:${BRAND.phone}`}>
+        <a className="btn btn-outline btn-block mt-1" href={`tel:${brand.phone}`}>
           <Icon name="phone" /> ثبت سفارش با تماس
         </a>
         <p className="sum-note text-center" style={{ display: "block" }}>
@@ -402,27 +573,80 @@ function CheckoutForm() {
     {modal === "pay" ? (
       <AppModal
         title="پرداخت آنلاین"
-        subtitle="درگاه زرین‌پال روی همین مرحله وصل می‌شود"
+        subtitle="با تایید، به درگاه امن زرین‌پال منتقل می‌شوید"
         icon="card"
         wide
-        onClose={() => setModal(null)}
+        onClose={() => {
+          if (!busy) setModal(null);
+        }}
       >
-        <PaymentSheet items={items} total={total} hasWeight={cartHasWeightItems(cart)} phone={session?.user.phone || phone} />
+        <PaymentSheet
+          items={items}
+          total={payable}
+          subtotal={total}
+          coupon={applied}
+          hasWeight={cartHasWeightItems(cart)}
+          phone={session?.user.phone || phone}
+          busy={busy}
+          onPay={startOnlinePayment}
+        />
       </AppModal>
     ) : null}
     </>
   );
 }
 
+function PayFailedBox({
+  order,
+  onRetry,
+  busy,
+}: {
+  order: PublicOrder | null;
+  onRetry: () => void;
+  busy: boolean;
+}) {
+  return (
+    <div className="success-box">
+      <div className="s-ico" style={{ background: "var(--wine-tint, #f3e6e6)", color: "var(--wine)" }}>
+        <Icon name="close" />
+      </div>
+      <h2>پرداخت انجام نشد</h2>
+      <p>
+        {order ? (
+          <>
+            سفارش <b className="num" dir="ltr">{order.orderNo}</b> ثبت شده است. می‌توانید دوباره پرداخت کنید یا بعداً از حساب کاربری اقدام کنید.
+          </>
+        ) : (
+          "پرداخت لغو شد یا تایید نشد. اگر مبلغی کم شده باشد، معمولاً ظرف مدت کوتاهی به حساب برمی‌گردد."
+        )}
+      </p>
+      {order && canPayOnlineOrder(order) ? (
+        <button type="button" className="btn btn-primary btn-block" disabled={busy} onClick={onRetry}>
+          <Icon name="card" /> {busy ? "در حال انتقال…" : "تلاش دوباره پرداخت"}
+        </button>
+      ) : null}
+      <Link className="btn btn-light btn-block mt-1" href={pageHref("account")}>
+        مشاهده سفارش‌های من
+      </Link>
+      <Link className="btn btn-outline btn-block mt-1" href={pageHref("shop")}>
+        بازگشت به فروشگاه
+      </Link>
+    </div>
+  );
+}
+
 function CheckoutContent() {
   const params = useSearchParams();
   const done = params.get("done") === "1";
+  const payFailed = params.get("pay") === "failed";
+  const paid = params.get("paid") === "1";
   const no = params.get("no");
   const token = params.get("t");
   const [order, setOrder] = useState<PublicOrder | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
-    if (!done) return;
+    if (!done && !payFailed) return;
     try {
       const cached = sessionStorage.getItem(LAST_ORDER_KEY);
       if (cached) {
@@ -440,9 +664,31 @@ function CheckoutContent() {
         if (data?.order) setOrder(data.order);
       })
       .catch(() => {});
-  }, [done, no, token]);
+  }, [done, payFailed, no, token]);
 
-  return <main className="container" id="checkout-wrap">{done ? <SuccessBox order={order} /> : <CheckoutForm />}</main>;
+  async function retryPayment() {
+    if (!order || retrying) return;
+    setRetrying(true);
+    try {
+      const result = await requestZarinpalCheckout({ orderNo: order.orderNo });
+      window.location.href = result.paymentUrl;
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "اتصال به درگاه انجام نشد");
+      setRetrying(false);
+    }
+  }
+
+  return (
+    <main className="container" id="checkout-wrap">
+      {done ? (
+        <SuccessBox order={order} paid={paid} />
+      ) : payFailed ? (
+        <PayFailedBox order={order} busy={retrying} onRetry={retryPayment} />
+      ) : (
+        <CheckoutForm />
+      )}
+    </main>
+  );
 }
 
 export default function CheckoutPage() {

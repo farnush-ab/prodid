@@ -1,5 +1,6 @@
 import "next-auth";
 import "next-auth/jwt";
+import type { UserRole } from "@/lib/roles";
 
 declare module "next-auth" {
   interface Session {
@@ -7,6 +8,7 @@ declare module "next-auth" {
       id: string;
       phone: string;
       name?: string | null;
+      role?: UserRole;
     };
   }
 
@@ -14,6 +16,7 @@ declare module "next-auth" {
     id: string;
     phone: string;
     name?: string | null;
+    role?: UserRole;
   }
 }
 
@@ -22,5 +25,6 @@ declare module "next-auth/jwt" {
     id: string;
     phone: string;
     name?: string | null;
+    role?: UserRole;
   }
 }

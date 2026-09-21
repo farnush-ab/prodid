@@ -19,7 +19,7 @@ export function RevenueChart({ data, height = 220 }: { data: number[]; height?: 
   const padR = 6;
   const padT = 18;
   const padB = 20;
-  const max = Math.max(...data) * 1.12;
+  const max = Math.max(...data, 1) * 1.12;
 
   const x = (i: number) => padL + (i / (data.length - 1)) * (W - padL - padR);
   const y = (v: number) => padT + (1 - v / max) * (H - padT - padB);

@@ -12,8 +12,8 @@ export function TeamView({
   onAdd,
 }: {
   team: TeamMember[];
-  onToggleStatus: (index: number) => void;
-  onRemove: (index: number) => void;
+  onToggleStatus: (phone: string) => void;
+  onRemove: (phone: string) => void;
   onAdd: (member: TeamMember) => void;
 }) {
   const [inviting, setInviting] = useState(false);
@@ -54,9 +54,9 @@ export function TeamView({
               </tr>
             </thead>
             <tbody>
-              {team.map((t, i) => (
+              {team.map((t) => (
                 <tr key={t.phone}>
-                  <td className="adm-cell-main">{t.name}</td>
+                  <td className="adm-cell-main">{t.name || "بدون نام"}</td>
                   <td dir="ltr">{t.phone}</td>
                   <td>{TEAM_ROLE_LABEL[t.role]}</td>
                   <td className="adm-cell-sub">{t.active}</td>
@@ -64,10 +64,10 @@ export function TeamView({
                   <td>
                     {t.role !== "owner" ? (
                       <div className="adm-row-actions">
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onToggleStatus(i)}>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onToggleStatus(t.phone)}>
                           {t.status === "active" ? "غیرفعال کردن" : "فعال کردن"}
                         </button>
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRemove(i)}>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRemove(t.phone)}>
                           حذف
                         </button>
                       </div>

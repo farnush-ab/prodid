@@ -5,7 +5,7 @@ import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { Icon } from "@/lib/icons";
 import { pageHref } from "@/lib/page";
-import { BRAND } from "@/lib/data";
+import { useCatalog } from "@/lib/catalog-store";
 import { Profile, AssistantPrefs } from "@/lib/profile";
 import { fmtPrice, faNum, qtyLabelBySale, toFa } from "@/lib/format";
 import { toast } from "@/lib/toast";
@@ -13,11 +13,14 @@ import {
   ORDER_STATUS_LABEL,
   PAY_METHOD_LABEL,
   PAY_STATUS_LABEL,
+  canPayOnlineOrder,
   dayLabel,
   orderWhatsappUrl,
   slotLabel,
   type PublicOrder,
 } from "@/lib/order";
+import { requestZarinpalCheckout } from "@/lib/zarinpal-client";
+import { orderPayable } from "@/lib/coupon";
 
 type TabId = "overview" | "profile" | "orders" | "settings";
 
@@ -34,14 +37,17 @@ function orderDate(o: PublicOrder) {
 
 export default function AccountPage() {
   const { data: session, update } = useSession();
+  const { brand } = useCatalog();
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [orders, setOrders] = useState<PublicOrder[]>([]);
   const [assistantOn, setAssistantOn] = useState(true);
   const [loaded, setLoaded] = useState(false);
+  const [payingNo, setPayingNo] = useState<string | null>(null);
 
   useEffect(() => {
     const local = Profile.read();
@@ -57,6 +63,7 @@ export default function AccountPage() {
             setName(me.name || "");
             setPhone(me.phone || session?.user.phone || "");
             setAddress(me.address || "");
+            setBirthDate(me.birthDate || "");
             Profile.write({ name: me.name || "", phone: me.phone || "", address: me.address || "" });
           }
         } else if (!cancelled) {
@@ -87,7 +94,7 @@ export default function AccountPage() {
   const stats = useMemo(
     () => ({
       count: orders.length,
-      total: orders.reduce((s, o) => s + (o.finalTotal ?? o.estimatedTotal), 0),
+      total: orders.filter((o) => o.status !== "cancelled").reduce((s, o) => s + orderPayable(o), 0),
       last: orders.length ? orderDate(orders[0]) : "—",
     }),
     [orders]
@@ -101,10 +108,11 @@ export default function AccountPage() {
       const res = await fetch("/api/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: n, address: addr }),
+        body: JSON.stringify({ name: n, address: addr, birthDate }),
       });
       if (!res.ok) {
-        toast("ذخیره اطلاعات انجام نشد");
+        const data = await res.json().catch(() => ({}));
+        toast(data.error || "ذخیره اطلاعات انجام نشد");
         return;
       }
       Profile.write({ name: n, phone, address: addr });
@@ -136,6 +144,18 @@ export default function AccountPage() {
       toast("اطلاعات پروفایل پاک شد");
     } catch {
       toast("پاک‌کردن اطلاعات انجام نشد");
+    }
+  }
+
+  async function payOrder(orderNo: string) {
+    if (payingNo) return;
+    setPayingNo(orderNo);
+    try {
+      const { paymentUrl } = await requestZarinpalCheckout({ orderNo });
+      window.location.href = paymentUrl;
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "اتصال به درگاه انجام نشد");
+      setPayingNo(null);
     }
   }
 
@@ -210,7 +230,7 @@ export default function AccountPage() {
               <Link className="acc-side-link" href={pageHref("terms")}>
                 <Icon name="note" /> قوانین و مقررات
               </Link>
-              <a className="acc-side-link" href={`tel:${BRAND.phone}`}>
+              <a className="acc-side-link" href={`tel:${brand.phone}`}>
                 <Icon name="phone" /> تماس با پشتیبانی
               </a>
             </div>
@@ -273,7 +293,9 @@ export default function AccountPage() {
                 {loaded && !orders.length ? (
                   <EmptyOrders />
                 ) : (
-                  orders.slice(0, 2).map((o) => <OrderCard key={o.id} order={o} onCancel={cancelOrder} />)
+                  orders.slice(0, 2).map((o) => (
+                    <OrderCard key={o.id} order={o} onCancel={cancelOrder} onPay={payOrder} paying={payingNo === o.orderNo} />
+                  ))
                 )}
               </div>
             )}
@@ -304,6 +326,11 @@ export default function AccountPage() {
                         placeholder="محله، خیابان، کوچه، پلاک"
                       />
                     </div>
+                    <div>
+                      <label htmlFor="a-birth">تاریخ تولد</label>
+                      <input id="a-birth" type="date" dir="ltr" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+                      <span className="hint">برای پیامک و تخفیف تولد، تاریخ میلادی را وارد کنید</span>
+                    </div>
                     <button type="submit" className="btn btn-dark">
                       ذخیره اطلاعات
                     </button>
@@ -321,7 +348,9 @@ export default function AccountPage() {
                 {loaded && !orders.length ? (
                   <EmptyOrders />
                 ) : (
-                  orders.map((o) => <OrderCard key={o.id} order={o} onCancel={cancelOrder} />)
+                  orders.map((o) => (
+                    <OrderCard key={o.id} order={o} onCancel={cancelOrder} onPay={payOrder} paying={payingNo === o.orderNo} />
+                  ))
                 )}
               </div>
             )}
@@ -393,8 +422,18 @@ function EmptyOrders() {
   );
 }
 
-function OrderCard({ order: o, onCancel }: { order: PublicOrder; onCancel: (no: string) => void }) {
-  const total = o.finalTotal ?? o.estimatedTotal;
+function OrderCard({
+  order: o,
+  onCancel,
+  onPay,
+  paying,
+}: {
+  order: PublicOrder;
+  onCancel: (no: string) => void;
+  onPay: (no: string) => void;
+  paying?: boolean;
+}) {
+  const total = orderPayable(o);
   return (
     <div className="order-card">
       <div className="o-head">
@@ -419,8 +458,14 @@ function OrderCard({ order: o, onCancel }: { order: PublicOrder; onCancel: (no: 
       </div>
       <div className="muted" style={{ fontSize: ".75rem" }}>
         پرداخت: {PAY_METHOD_LABEL[o.paymentMethod]} — {PAY_STATUS_LABEL[o.paymentStatus]}
+        {o.coupon ? ` — تخفیف ${o.coupon.percent}٪ (${o.coupon.code})` : ""}
       </div>
       <div className="order-actions">
+        {canPayOnlineOrder(o) ? (
+          <button type="button" className="btn btn-sm btn-primary" disabled={paying} onClick={() => onPay(o.orderNo)}>
+            <Icon name="card" /> {paying ? "در حال انتقال…" : o.paymentStatus === "failed" ? "تلاش دوباره پرداخت" : "پرداخت آنلاین"}
+          </button>
+        ) : null}
         <a className="btn btn-sm btn-outline" href={orderWhatsappUrl(o, "track")} target="_blank" rel="noopener">
           <Icon name="chat" /> پیگیری در واتس‌اپ
         </a>

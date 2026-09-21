@@ -13,7 +13,8 @@
    ========================================================= */
 
 import { useSyncExternalStore } from "react";
-import { getProduct, type Product } from "./data";
+import type { Product } from "./data";
+import { getLiveProduct } from "./catalog-store";
 
 const CART_KEY = "prodid_cart";
 export const MIN_WEIGHT = 0.1; // حداقل وزن سفارش: ۱۰۰ گرم
@@ -75,7 +76,7 @@ export function cartCount(cart: CartMap) {
 }
 export function cartItems(cart: CartMap) {
   return Object.entries(cart)
-    .map(([id, qty]) => ({ p: getProduct(id), qty }))
+    .map(([id, qty]) => ({ p: getLiveProduct(id), qty }))
     .filter((it): it is { p: Product; qty: number } => !!it.p);
 }
 export function cartTotal(cart: CartMap) {
@@ -88,7 +89,7 @@ export function cartHasWeightItems(cart: CartMap) {
 /** جهش‌ها (mutations) — فقط از هندلرهای رویداد صدا زده می‌شوند، نه در حین رندر */
 export const Cart = {
   add(id: string, amount?: number) {
-    const p = getProduct(id);
+    const p = getLiveProduct(id);
     if (!p || !p.available || p.price === null) return;
     const c = { ...getSnapshot() };
     const next = Math.round(((c[id] || 0) + (amount ?? defaultAdd(p))) * 1000) / 1000;

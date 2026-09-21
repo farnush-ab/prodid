@@ -1,5 +1,6 @@
 import { Schema, model, models, type Model, type Types } from "mongoose";
 import type { DeliveryDay, DeliverySlot, OrderStatus, PayMethod, PayStatus } from "@/lib/order";
+import type { OrderCoupon } from "@/lib/coupon";
 
 export interface OrderItemDoc {
   productId: string;
@@ -26,6 +27,7 @@ export interface OrderDoc {
   finalTotal: number | null;
   deliveryFee: number | null;
   hasWeightItems: boolean;
+  coupon: OrderCoupon | null;
   // برای اتصال بعدی زرین‌پال
   zarinpalAuthority?: string;
   zarinpalRefId?: string;
@@ -71,7 +73,8 @@ const OrderSchema = new Schema<OrderDoc>(
     finalTotal: { type: Number, default: null },
     deliveryFee: { type: Number, default: null },
     hasWeightItems: { type: Boolean, default: false },
-    zarinpalAuthority: { type: String, default: "" },
+    coupon: { type: Schema.Types.Mixed, default: null },
+    zarinpalAuthority: { type: String, default: "", index: true },
     zarinpalRefId: { type: String, default: "" },
   },
   { timestamps: true }

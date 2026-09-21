@@ -1,19 +1,20 @@
 "use client";
 
-import { CATEGORIES, PRODUCTS, BRAND } from "@/lib/data";
 import { Icon } from "@/lib/icons";
 import { pageHref } from "@/lib/page";
 import { ProductCard } from "@/components/ProductCard";
 import { CategoryCard } from "@/components/CategoryCard";
 import { useReveal } from "@/components/Reveal";
+import { useCatalog } from "@/lib/catalog-store";
 import Link from "next/link";
 
-const BEST = PRODUCTS.filter((p) => p.badge === "پرفروش")
-  .concat(PRODUCTS.filter((p) => p.badge === "ویژه"))
-  .slice(0, 4);
-const FRESH = PRODUCTS.filter((p) => ["veg", "kebab"].includes(p.cat)).slice(0, 4);
-
 export default function HomePage() {
+  const { products, categories, brand } = useCatalog();
+  const BEST = products
+    .filter((p) => p.badge === "پرفروش")
+    .concat(products.filter((p) => p.badge === "ویژه"))
+    .slice(0, 4);
+  const FRESH = products.filter((p) => ["veg", "kebab"].includes(p.cat)).slice(0, 4);
   const catsHead = useReveal<HTMLDivElement>();
   const bestHead = useReveal<HTMLDivElement>();
   const banner = useReveal<HTMLDivElement>();
@@ -54,7 +55,7 @@ export default function HomePage() {
               <Link className="btn btn-primary" href={pageHref("shop")}>
                 <Icon name="basket" /> سفارش آنلاین
               </Link>
-              <a className="btn btn-outline-light" href={`tel:${BRAND.phone}`}>
+              <a className="btn btn-outline-light" href={`tel:${brand.phone}`}>
                 <Icon name="phone" /> سفارش تلفنی
               </a>
             </div>
@@ -66,7 +67,7 @@ export default function HomePage() {
                 <Icon name="award" /> کیفیت تضمینی
               </span>
               <span className="hero-mark">
-                <Icon name="pin" /> {BRAND.address}
+                <Icon name="pin" /> {brand.address}
               </span>
             </div>
           </div>
@@ -80,7 +81,7 @@ export default function HomePage() {
           <h2 className="section-title">دسته‌بندی محصولات</h2>
         </div>
         <div className="cats-grid">
-          {CATEGORIES.map((c, i) => (
+          {categories.map((c, i) => (
             <CategoryCard key={c.id} c={c} index={i} />
           ))}
         </div>
@@ -145,7 +146,7 @@ export default function HomePage() {
             </span>
             <div>
               <b>فروشگاه حضوری در کاشان</b>
-              <span>{BRAND.address}</span>
+              <span>{brand.address}</span>
             </div>
           </div>
           <div className="trust-item">
@@ -154,8 +155,8 @@ export default function HomePage() {
             </span>
             <div>
               <b>پاسخگویی سریع</b>
-              <a href={`tel:${BRAND.phone}`} className="num">
-                {BRAND.phone.replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)])}
+              <a href={`tel:${brand.phone}`} className="num">
+                {brand.phone.replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)])}
               </a>
             </div>
           </div>
@@ -165,8 +166,8 @@ export default function HomePage() {
             </span>
             <div>
               <b>ما را دنبال کنید</b>
-              <a href={BRAND.instagramUrl} target="_blank" rel="noopener">
-                اینستاگرام {BRAND.instagram}@
+              <a href={brand.instagramUrl} target="_blank" rel="noopener">
+                اینستاگرام {brand.instagram}@
               </a>
             </div>
           </div>

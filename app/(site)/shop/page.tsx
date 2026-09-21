@@ -3,15 +3,16 @@
 import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/lib/icons";
-import { CATEGORIES, PRODUCTS, type SaleType } from "@/lib/data";
+import { type SaleType } from "@/lib/data";
 import { faNum } from "@/lib/format";
 import { ProductCard } from "@/components/ProductCard";
-
-const CATS = [{ id: "all", name: "همه" }, ...CATEGORIES.filter((c) => !c.soon)];
+import { useCatalog } from "@/lib/catalog-store";
 
 type SortKey = "default" | "price-asc" | "price-desc" | "name";
 
 function ShopContent() {
+  const { products, categories } = useCatalog();
+  const CATS = [{ id: "all", name: "همه" }, ...categories.filter((c) => !c.soon)];
   const params = useSearchParams();
   const [cat, setCat] = useState(params?.get("cat") || "all");
   const [q] = useState(params?.get("q") || "");
@@ -20,7 +21,7 @@ function ShopContent() {
   const [onlyAvailable, setOnlyAvailable] = useState(false);
 
   const list = useMemo(() => {
-    let l = PRODUCTS.slice();
+    let l = products.slice();
     if (cat !== "all") l = l.filter((p) => p.cat === cat);
     if (q) {
       const query = q.trim();
@@ -33,7 +34,7 @@ function ShopContent() {
     if (sort === "price-desc") l.sort((a, b) => (b.price ?? -1) - (a.price ?? -1));
     if (sort === "name") l.sort((a, b) => a.name.localeCompare(b.name, "fa"));
     return l;
-  }, [cat, q, type, sort, onlyAvailable]);
+  }, [cat, q, type, sort, onlyAvailable, products]);
 
   return (
     <>

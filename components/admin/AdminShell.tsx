@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { signOut } from "next-auth/react";
 import { Icon } from "@/lib/icons";
-import { toast } from "@/lib/toast";
+import { canAccessSection, TEAM_ROLE_LABEL, type StaffRole } from "@/lib/roles";
+import type { AdminMe, AdminNotification } from "@/lib/admin-state";
 
 export type AdminView =
   | "dashboard"
@@ -16,7 +18,8 @@ export type AdminView =
   | "assistant"
   | "security"
   | "settings"
-  | "reports";
+  | "reports"
+  | "coupons";
 
 interface NavItem {
   id: AdminView;
@@ -35,6 +38,7 @@ const NAV: NavGroup[] = [
     items: [
       { id: "orders", label: "سفارش‌ها", icon: "package" },
       { id: "payments", label: "پرداخت‌ها", icon: "wallet" },
+      { id: "coupons", label: "تخفیف‌ها", icon: "award" },
     ],
   },
   {
@@ -68,12 +72,7 @@ const NAV: NavGroup[] = [
   },
 ];
 
-const NOTIFICATIONS = [
-  { icon: "package", title: "سفارش جدید PRD-1049 ثبت شد", time: "۲ دقیقه پیش" },
-  { icon: "wallet", title: "پرداخت کارت‌به‌کارت نیاز به تایید دارد", time: "۱۰ دقیقه پیش" },
-  { icon: "shield", title: "یک شماره به دلیل تلاش زیاد مسدود شد", time: "۴۰ دقیقه پیش" },
-  { icon: "box", title: "فیله ران مرغ زعفرانی رو به اتمام است", time: "۱ ساعت پیش" },
-];
+const NOTIFICATIONS: AdminNotification[] = [];
 
 export function AdminShell({
   active,
@@ -81,6 +80,9 @@ export function AdminShell({
   pendingOrders,
   maintenanceOn,
   onSearch,
+  role = "owner",
+  me,
+  notifications = NOTIFICATIONS,
   children,
 }: {
   active: AdminView;
@@ -88,6 +90,9 @@ export function AdminShell({
   pendingOrders: number;
   maintenanceOn: boolean;
   onSearch?: (q: string) => { id: string; label: string; kind: string; icon: string; view: AdminView }[];
+  role?: StaffRole;
+  me?: AdminMe;
+  notifications?: AdminNotification[];
   children: React.ReactNode;
 }) {
   const [navOpen, setNavOpen] = useState(false);
@@ -96,6 +101,9 @@ export function AdminShell({
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const displayName = me?.name?.trim() || "مدیر";
+  const initial = displayName.charAt(0);
+  const roleLabel = me?.role ? TEAM_ROLE_LABEL[me.role].split("—")[0].trim() : "مدیر";
   const results = query.trim() && onSearch ? onSearch(query.trim()) : [];
 
   /* «/» برای پرش به جستجو، Esc برای بستن آن — میان‌بر رایج پنل‌های مدیریتی */
@@ -137,10 +145,13 @@ export function AdminShell({
           </div>
         </div>
         <nav className="adm-sidebar-scroll">
-          {NAV.map((group) => (
+          {NAV.map((group) => {
+            const items = group.items.filter((item) => canAccessSection(role, item.id));
+            if (!items.length) return null;
+            return (
             <div className="adm-nav-group" key={group.label}>
               <div className="adm-nav-label">{group.label}</div>
-              {group.items.map((item) => (
+              {items.map((item) => (
                 <button
                   key={item.id}
                   type="button"
@@ -155,14 +166,15 @@ export function AdminShell({
                 </button>
               ))}
             </div>
-          ))}
+            );
+          })}
         </nav>
         <div className="adm-sidebar-foot">
           <div className="adm-mini-profile">
-            <span className="adm-mini-avatar">ع</span>
+            <span className="adm-mini-avatar">{initial}</span>
             <div className="adm-mini-profile-text">
-              <b>عاطفه رستمی</b>
-              <span>مالک فروشگاه</span>
+              <b>{displayName}</b>
+              <span>{roleLabel}</span>
             </div>
           </div>
         </div>
@@ -230,19 +242,33 @@ export function AdminShell({
               aria-label="اعلان‌ها"
             >
               <Icon name="bell" />
-              <span className="dot" />
+              {notifications.length ? <span className="dot" /> : null}
             </button>
             {bellOpen ? (
               <div className="adm-dropdown">
-                {NOTIFICATIONS.map((n, i) => (
-                  <div className="adm-dropdown-item" key={i}>
-                    <Icon name={n.icon} />
-                    <span>
-                      {n.title}
-                      <small>{n.time}</small>
-                    </span>
-                  </div>
-                ))}
+                {notifications.length ? (
+                  notifications.map((n, i) => (
+                    <button
+                      type="button"
+                      className="adm-dropdown-item"
+                      key={i}
+                      onClick={() => {
+                        if (n.view) go(n.view as AdminView);
+                        setBellOpen(false);
+                      }}
+                    >
+                      <Icon name={n.icon} />
+                      <span>
+                        {n.title}
+                        <small>{n.time}</small>
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="hint" style={{ padding: "14px 12px", margin: 0 }}>
+                    اعلان جدیدی نیست
+                  </p>
+                )}
               </div>
             ) : null}
           </div>
@@ -256,30 +282,34 @@ export function AdminShell({
               }}
             >
               <span className="adm-mini-avatar" style={{ width: 26, height: 26, fontSize: "0.7rem" }}>
-                ع
+                {initial}
               </span>
               <span>
                 <span className="name" style={{ display: "block" }}>
-                  عاطفه رستمی
+                  {displayName}
                 </span>
-                <span className="role">مالک</span>
+                <span className="role">{roleLabel}</span>
               </span>
             </button>
             {profileOpen ? (
               <div className="adm-dropdown" style={{ width: 190 }}>
-                <button type="button" className="adm-dropdown-item" onClick={() => { go("settings"); setProfileOpen(false); }}>
-                  <Icon name="gear" /> تنظیمات فروشگاه
-                </button>
-                <button type="button" className="adm-dropdown-item" onClick={() => { go("team"); setProfileOpen(false); }}>
-                  <Icon name="shield" /> تیم ادمین
-                </button>
+                {canAccessSection(role, "settings") ? (
+                  <button type="button" className="adm-dropdown-item" onClick={() => { go("settings"); setProfileOpen(false); }}>
+                    <Icon name="gear" /> تنظیمات فروشگاه
+                  </button>
+                ) : null}
+                {canAccessSection(role, "team") ? (
+                  <button type="button" className="adm-dropdown-item" onClick={() => { go("team"); setProfileOpen(false); }}>
+                    <Icon name="shield" /> تیم ادمین
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="adm-dropdown-item"
                   style={{ color: "var(--danger)" }}
                   onClick={() => {
-                    toast("این یک نسخه نمایشی است");
                     setProfileOpen(false);
+                    signOut({ callbackUrl: "/" });
                   }}
                 >
                   <Icon name="arrow" /> خروج

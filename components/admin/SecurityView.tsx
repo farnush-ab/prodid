@@ -4,36 +4,42 @@ import { useState } from "react";
 import { faNum } from "@/lib/format";
 import { toast } from "@/lib/toast";
 import type { OtpLogEntry } from "@/lib/admin-data";
-import { OTP_DEFAULTS } from "@/lib/admin-data";
+import type { OtpLimits } from "@/lib/otp-config";
 
 const RESULT_PILL: Record<OtpLogEntry["result"], string> = {
   ok: "adm-pill-done",
   blocked: "adm-pill-danger",
   expired: "adm-pill-wait",
+  fail: "adm-pill-wait",
 };
 const RESULT_LABEL: Record<OtpLogEntry["result"], string> = {
   ok: "ارسال موفق",
   blocked: "مسدود شد",
   expired: "منقضی شد",
+  fail: "کد اشتباه",
 };
 
 export function SecurityView({
   log,
   blocked,
+  otp,
+  onSaveOtp,
   onAddBlocked,
   onRemoveBlocked,
 }: {
   log: OtpLogEntry[];
   blocked: string[];
+  otp: OtpLimits;
+  onSaveOtp: (otp: OtpLimits) => void;
   onAddBlocked: (phone: string) => void;
-  onRemoveBlocked: (index: number) => void;
+  onRemoveBlocked: (phone: string) => void;
 }) {
   const [settings, setSettings] = useState({
-    ttlMinutes: String(OTP_DEFAULTS.ttlMinutes),
-    resendSeconds: String(OTP_DEFAULTS.resendSeconds),
-    windowHours: String(OTP_DEFAULTS.windowHours),
-    maxSends: String(OTP_DEFAULTS.maxSends),
-    maxAttempts: String(OTP_DEFAULTS.maxAttempts),
+    ttlMinutes: String(otp.ttlMinutes),
+    resendSeconds: String(otp.resendSeconds),
+    windowHours: String(otp.windowHours),
+    maxSends: String(otp.maxSends),
+    maxAttempts: String(otp.maxAttempts),
   });
   const [logSearch, setLogSearch] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
@@ -59,7 +65,13 @@ export function SecurityView({
             style={{ padding: 18 }}
             onSubmit={(e) => {
               e.preventDefault();
-              toast("تنظیمات OTP ذخیره شد");
+              onSaveOtp({
+                ttlMinutes: Number(settings.ttlMinutes) || 2,
+                resendSeconds: Number(settings.resendSeconds) || 60,
+                windowHours: Number(settings.windowHours) || 1,
+                maxSends: Number(settings.maxSends) || 5,
+                maxAttempts: Number(settings.maxAttempts) || 5,
+              });
             }}
           >
             <div>
@@ -112,10 +124,10 @@ export function SecurityView({
             </button>
           </div>
           {blocked.length ? (
-            blocked.map((p, i) => (
+            blocked.map((p) => (
               <div className="adm-item-line" style={{ padding: "9px 18px" }} key={p}>
                 <span dir="ltr">{p}</span>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRemoveBlocked(i)}>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRemoveBlocked(p)}>
                   رفع مسدودی
                 </button>
               </div>
@@ -132,7 +144,7 @@ export function SecurityView({
         <div className="adm-card-head">
           <div>
             <h3>گزارش درخواست‌های کد</h3>
-            <div className="sub">۲۴ ساعت اخیر</div>
+            <div className="sub">آخرین تلاش‌های ورود</div>
           </div>
           <input type="text" placeholder="جستجوی شماره موبایل…" value={logSearch} onChange={(e) => setLogSearch(e.target.value)} style={{ width: 220 }} />
         </div>
@@ -148,7 +160,7 @@ export function SecurityView({
             </thead>
             <tbody>
               {filteredLog.map((r, i) => (
-                <tr key={i}>
+                <tr key={`${r.phone}-${r.time}-${i}`}>
                   <td dir="ltr">{r.phone}</td>
                   <td>{r.time}</td>
                   <td>{faNum.format(r.attempts)}</td>

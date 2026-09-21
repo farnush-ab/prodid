@@ -1,8 +1,7 @@
 "use client";
 
-import { CATEGORIES } from "@/lib/data";
+import type { Category, Product } from "@/lib/data";
 import { fmtPrice } from "@/lib/format";
-import type { Product } from "@/lib/data";
 
 const CAT_COLOR: Record<string, string> = {
   meat: "#2a78d6",
@@ -14,10 +13,10 @@ const CAT_COLOR: Record<string, string> = {
   salad: "#4a3aa7",
 };
 
-export function CategoryBars({ products }: { products: (Product & { sold: number })[] }) {
+export function CategoryBars({ products, categories = [] }: { products: (Product & { sold: number })[]; categories?: Category[] }) {
   const totals = new Map<string, number>();
   products.forEach((p) => {
-    totals.set(p.cat, (totals.get(p.cat) || 0) + p.sold * (p.price || 200000));
+    totals.set(p.cat, (totals.get(p.cat) || 0) + p.sold * (p.price || 0));
   });
   const rows = [...totals.entries()].sort((a, b) => b[1] - a[1]);
   const max = rows[0]?.[1] || 1;
@@ -25,7 +24,7 @@ export function CategoryBars({ products }: { products: (Product & { sold: number
   return (
     <div style={{ paddingTop: 6 }}>
       {rows.map(([catId, value]) => {
-        const cat = CATEGORIES.find((c) => c.id === catId);
+        const cat = categories.find((c) => c.id === catId);
         const color = CAT_COLOR[catId] || "#8d8172";
         return (
           <div className="adm-bar-row" key={catId}>

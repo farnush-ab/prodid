@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Icon } from "@/lib/icons";
-import { BRAND } from "@/lib/data";
+import { useCatalog } from "@/lib/catalog-store";
 import { toFa } from "@/lib/format";
 import { NAV_LINKS } from "@/lib/nav";
 import { pageHref } from "@/lib/page";
@@ -46,6 +46,7 @@ function SearchForm({ id }: { id: string }) {
 }
 
 export function Header() {
+  const { brand } = useCatalog();
   const n = cartCount(useCart());
   const pathname = usePathname();
   const page = currentPageId(pathname);
@@ -56,12 +57,12 @@ export function Header() {
   return (
     <header className="site-header">
       <div className="container header-inner">
-        <Link className="logo" href={pageHref("index")} aria-label={`پرودید — ${BRAND.slogan}`}>
+        <Link className="logo" href={pageHref("index")} aria-label={`${brand.name} — ${brand.slogan}`}>
           {logoOk ? (
             <img
               className="logo-img"
               src="/assets/img/logo.png"
-              alt={`پرودید — ${BRAND.slogan}`}
+              alt={`${brand.name} — ${brand.slogan}`}
               onError={() => setLogoOk(false)}
             />
           ) : (
@@ -72,7 +73,7 @@ export function Header() {
               <span className="logo-text">
                 <span className="logo-name">پرودید</span>
                 <br />
-                <span className="logo-slogan">{BRAND.slogan}</span>
+                <span className="logo-slogan">{brand.slogan}</span>
               </span>
             </span>
           )}
@@ -80,10 +81,10 @@ export function Header() {
 
         <SearchForm id="search-desktop" />
 
-        <a className="header-phone" href={`tel:${BRAND.phone}`}>
+        <a className="header-phone" href={`tel:${brand.phone}`}>
           <Icon name="phone" />
           <span>
-            سفارش تلفنی <b className="num">{toFa(BRAND.phone)}</b>
+            سفارش تلفنی <b className="num">{toFa(brand.phone)}</b>
           </span>
         </a>
 

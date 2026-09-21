@@ -3,21 +3,32 @@
 import { Icon } from "@/lib/icons";
 import { fmtPrice, faNum } from "@/lib/format";
 import type { AdminOrder } from "@/lib/admin-data";
-import { REVENUE_SERIES } from "@/lib/admin-data";
-import type { Product } from "@/lib/data";
+import type { Category, Product } from "@/lib/data";
 import { RevenueChart } from "./RevenueChart";
 import { CategoryBars } from "./CategoryBars";
+import { orderPayable } from "@/lib/coupon";
 
-export function ReportsView({ orders, products }: { orders: AdminOrder[]; products: (Product & { sold: number })[] }) {
-  const totalRevenue = REVENUE_SERIES.reduce((a, b) => a + b, 0);
+export function ReportsView({
+  orders,
+  products,
+  revenueSeries,
+  categories,
+}: {
+  orders: AdminOrder[];
+  products: (Product & { sold: number })[];
+  revenueSeries: number[];
+  categories: Category[];
+}) {
+  const series = revenueSeries.length ? revenueSeries : [0];
+  const totalRevenue = series.reduce((a, b) => a + b, 0);
   const cancelled = orders.filter((o) => o.status === "cancelled").length;
-  const avgOrder = orders.reduce((s, o) => s + o.estimatedTotal, 0) / orders.length;
+  const avgOrder = orders.length ? orders.reduce((s, o) => s + orderPayable(o), 0) / orders.length : 0;
 
   const stats = [
     { label: "فروش ۱۴ روز اخیر", value: fmtPrice(totalRevenue), unit: "تومان", icon: "wallet", bg: "var(--brand-green-tint)", fg: "var(--brand-green-deep)" },
     { label: "تعداد سفارش", value: faNum.format(orders.length), unit: "سفارش", icon: "package", bg: "var(--wine-tint)", fg: "var(--wine)" },
     { label: "میانگین ارزش سفارش", value: fmtPrice(Math.round(avgOrder)), unit: "تومان", icon: "chart", bg: "var(--brand-orange-tint)", fg: "var(--brand-orange-deep)" },
-    { label: "نرخ لغو سفارش", value: faNum.format(Math.round((cancelled / orders.length) * 100)), unit: "درصد", icon: "close", bg: "rgba(214, 69, 51, 0.1)", fg: "var(--danger)" },
+    { label: "نرخ لغو سفارش", value: faNum.format(orders.length ? Math.round((cancelled / orders.length) * 100) : 0), unit: "درصد", icon: "close", bg: "rgba(214, 69, 51, 0.1)", fg: "var(--danger)" },
   ];
 
   const weightedSold = products.filter((p) => p.sale === "w").reduce((s, p) => s + p.sold, 0);
@@ -61,13 +72,13 @@ export function ReportsView({ orders, products }: { orders: AdminOrder[]; produc
               <div className="sub">تومان</div>
             </div>
           </div>
-          <RevenueChart data={REVENUE_SERIES} height={200} />
+          <RevenueChart data={series.length > 1 ? series : [0, 0]} height={200} />
         </div>
         <div className="adm-card">
           <div className="adm-card-head">
             <h3>سهم دسته‌ها از فروش</h3>
           </div>
-          <CategoryBars products={products} />
+          <CategoryBars products={products} categories={categories} />
         </div>
       </div>
 
@@ -92,7 +103,7 @@ export function ReportsView({ orders, products }: { orders: AdminOrder[]; produc
                     <td className="adm-cell-sub">{faNum.format(i + 1)}</td>
                     <td className="adm-cell-main">{p.name}</td>
                     <td className="amount">{faNum.format(p.sold)}</td>
-                    <td className="amount">{fmtPrice(p.sold * (p.price || 200000))} تومان</td>
+                    <td className="amount">{fmtPrice(Math.round(p.sold * (p.price || 0)))} تومان</td>
                   </tr>
                 ))}
               </tbody>

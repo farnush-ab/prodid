@@ -1,21 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Icon } from "@/lib/icons";
-import { BRAND, type Product } from "@/lib/data";
+import { type Product } from "@/lib/data";
+import { useCatalog } from "@/lib/catalog-store";
 import { fmtPrice, toFa, parseIntFa, qtyLabel } from "@/lib/format";
 import { pageHref } from "@/lib/page";
 import { Cart, useCart, cartItems, cartTotal, cartHasWeightItems, step } from "@/lib/cart";
 import { faNum } from "@/lib/format";
 import { toast } from "@/lib/toast";
+import { productImageSrc } from "@/lib/product-image";
 
 function CartItemImg({ p }: { p: Product }) {
+  const src = productImageSrc(p);
   const [ok, setOk] = useState(true);
+  useEffect(() => {
+    setOk(true);
+  }, [src]);
   return (
     <Link className="ci-img" href={`${pageHref("product")}?id=${p.id}`}>
       <Icon name={p.ic} />
-      {ok && <img src={`/assets/img/products/${p.id}.jpg`} alt="" onError={() => setOk(false)} />}
+      {ok && <img src={src} alt="" onError={() => setOk(false)} />}
     </Link>
   );
 }
@@ -113,7 +119,8 @@ function CartLayout({
   total: number;
   hasWeight: boolean;
 }) {
-  const underMin = total < BRAND.minOrder;
+  const { brand, features } = useCatalog();
+  const underMin = total < brand.minOrder;
 
   return (
     <div className="cart-layout">
@@ -160,15 +167,17 @@ function CartLayout({
         ) : null}
         <p className="sum-note">
           <Icon name="truck" />
-          <span>{BRAND.deliveryFeeNote}.</span>
+          <span>{brand.deliveryFeeNote}.</span>
         </p>
         {underMin ? (
           <div className="min-order-warn">
-            حداقل مبلغ سفارش {fmtPrice(BRAND.minOrder)} تومان است. {fmtPrice(BRAND.minOrder - total)} تومان دیگر به
+            حداقل مبلغ سفارش {fmtPrice(brand.minOrder)} تومان است. {fmtPrice(brand.minOrder - total)} تومان دیگر به
             سبد اضافه کنید.
           </div>
         ) : null}
-        {underMin ? (
+        {features.maintenance ? (
+          <p className="min-order-warn">فروشگاه موقتاً در حال به‌روزرسانی است؛ فعلا نمی‌توانید تسویه کنید.</p>
+        ) : underMin ? (
           <a
             className="btn btn-primary btn-block disabled"
             href="#"

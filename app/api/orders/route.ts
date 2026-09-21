@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthSession } from "@/lib/session";
 import { createOrder, listOrdersForUser, OrderError } from "@/lib/order-server";
+import { getStoreSettings } from "@/lib/catalog-server";
 import { orderWhatsappUrl, type CreateOrderInput } from "@/lib/order";
 
 export const runtime = "nodejs";
@@ -32,7 +33,8 @@ export async function POST(req: Request) {
 
   try {
     const order = await createOrder(body, user);
-    return NextResponse.json({ order, whatsappUrl: orderWhatsappUrl(order, "new") });
+    const settings = await getStoreSettings();
+    return NextResponse.json({ order, whatsappUrl: orderWhatsappUrl(order, "new", settings.brand.phoneIntl) });
   } catch (err) {
     if (err instanceof OrderError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

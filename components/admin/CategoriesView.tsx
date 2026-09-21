@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Icon } from "@/lib/icons";
 import type { Category } from "@/lib/data";
 import { AppModal } from "@/components/AppModal";
+import { IconSelect } from "./shared";
 
 export function CategoriesView({
   categories,
@@ -25,9 +26,10 @@ export function CategoriesView({
     e.preventDefault();
     const form = e.currentTarget;
     const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
+    const ic = (form.elements.namedItem("ic") as HTMLSelectElement).value.trim() || "box";
     const soon = (form.elements.namedItem("soon") as HTMLInputElement).checked;
     const isNew = editing === "new";
-    onSave(isNew ? { id: name.split(" ").join("-"), name, ic: "box", soon } : { ...(draft as Category), name, soon }, isNew);
+    onSave(isNew ? { id: name.split(" ").join("-"), name, ic, soon } : { ...(draft as Category), name, ic, soon }, isNew);
     setEditing(null);
   }
 
@@ -88,6 +90,10 @@ export function CategoriesView({
               <div>
                 <label htmlFor="cf-name">نام دسته</label>
                 <input id="cf-name" name="name" required defaultValue={draft?.name} />
+              </div>
+              <div>
+                <label htmlFor="cf-ic">آیکن</label>
+                <IconSelect id="cf-ic" name="ic" defaultValue={draft?.ic} />
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <label style={{ margin: 0 }}>وضعیت «به‌زودی»</label>
