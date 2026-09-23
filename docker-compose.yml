@@ -1,0 +1,44 @@
+# Production stack. MongoDB runs in this compose file.
+#
+# Put secrets in `.env` next to this file:
+#   NEXTAUTH_SECRET=...
+#   NEXTAUTH_URL=https://your-domain
+# MONGODB_URI from that file is overridden below so the app reaches the mongo service.
+#   docker compose up -d --build
+
+services:
+  prodid:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: prodid:latest
+    container_name: prodid
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongo:27017/prodid
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3200:3000"
+    volumes:
+      - product-uploads:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+volumes:
+  mongo-data:
+  product-uploads:
