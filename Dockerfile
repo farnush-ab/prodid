@@ -1,3 +1,31 @@
+# Production image for Prodid (Next.js 14 + MongoDB)
+
+FROM node:20-alpine AS deps
+
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+
+RUN npm ci
+
+
+FROM node:20-alpine AS builder
+
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN npm run build && rm -rf .next/cache
+
+
 FROM node:20-alpine AS runner
 
 RUN apk add --no-cache libc6-compat
@@ -16,11 +44,11 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev \
     && npm cache clean --force
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./next.config.js
 
-# Only the application upload directory needs to be writable.
+# Only this directory needs to be writable by the application.
 RUN mkdir -p /app/uploads/products \
     && chown -R nextjs:nodejs /app/uploads
 
