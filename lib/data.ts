@@ -21,7 +21,10 @@ export interface Product {
   price: number | null;
   sale: SaleType;
   ic: string;
+  /** کاور / اولین عکس — همیشه با images[0] هم‌گام است */
   image: string;
+  /** گالری عکس‌های محصول (حداکثر PRODUCT_IMAGES_MAX) */
+  images: string[];
   desc: string;
   badge: string;
   available: boolean;
@@ -58,7 +61,7 @@ export const CATEGORIES: Category[] = [
   sale: "u" = عددی / بسته‌ای
   price: null = استعلام قیمت (تماس بگیرید)
 */
-const RAW_PRODUCTS: Omit<Product, "available" | "image">[] = [
+const RAW_PRODUCTS: Omit<Product, "available" | "image" | "images">[] = [
   // ---- گوشت و استیک ----
   { id: "file-gosale", name: "فیله گوساله", cat: "meat", price: 1420000, sale: "w", ic: "steak", desc: "فیله تازه گوساله، مناسب استیک و کباب برگ.", badge: "" },
   { id: "tbone-gosfandi", name: "تی‌بون گوسفندی", cat: "meat", price: 1285000, sale: "w", ic: "steak", desc: "استیک تی‌بون گوسفندی تازه با برش حرفه‌ای.", badge: "" },
@@ -110,7 +113,7 @@ const RAW_PRODUCTS: Omit<Product, "available" | "image">[] = [
 ];
 
 // همه محصولات فعلاً موجود هستند؛ برای ناموجود کردن: available: false
-export const PRODUCTS: Product[] = RAW_PRODUCTS.map((p) => ({ ...p, available: true, image: "" }));
+export const PRODUCTS: Product[] = RAW_PRODUCTS.map((p) => ({ ...p, available: true, image: "", images: [] }));
 
 export const getProduct = (id: string | null | undefined): Product | undefined =>
   PRODUCTS.find((p) => p.id === id);

@@ -23,10 +23,14 @@ export function toProduct(doc: {
   sale: "w" | "u";
   ic: string;
   image?: string | null;
+  images?: string[] | null;
   desc: string;
   badge: string;
   available: boolean;
 }): Product {
+  const fromArr = (doc.images || []).map((s) => String(s || "").trim()).filter(Boolean);
+  const single = (doc.image || "").trim();
+  const images = fromArr.length ? fromArr : single ? [single] : [];
   return {
     id: doc.id,
     name: doc.name,
@@ -34,7 +38,8 @@ export function toProduct(doc: {
     price: doc.price,
     sale: doc.sale,
     ic: doc.ic,
-    image: (doc.image || "").trim(),
+    image: images[0] || "",
+    images,
     desc: doc.desc,
     badge: doc.badge,
     available: doc.available,

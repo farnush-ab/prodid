@@ -4,12 +4,25 @@ import { useEffect, useMemo, useState } from "react";
 import { fmtPrice } from "@/lib/format";
 import { Icon } from "@/lib/icons";
 import type { Category, Product, SaleType } from "@/lib/data";
-import { PRODUCT_IMAGE_ACCEPT, PRODUCT_IMAGE_MAX_BYTES, PRODUCT_IMAGE_MIMES, hasStoredProductImage, productImageSrc } from "@/lib/product-image";
+import {
+  PRODUCT_IMAGE_ACCEPT,
+  PRODUCT_IMAGE_MAX_BYTES,
+  PRODUCT_IMAGE_MIMES,
+  PRODUCT_IMAGES_MAX,
+  hasStoredProductImage,
+  productImageSrc,
+  productImagesSrc,
+  storedProductImages,
+} from "@/lib/product-image";
 import { toast } from "@/lib/toast";
 import { AppModal } from "@/components/AppModal";
 import { EmptyRow } from "./shared";
 
 type AdminProduct = Product & { sold: number };
+
+type DraftPhoto =
+  | { key: string; kind: "stored"; url: string }
+  | { key: string; kind: "file"; file: File; preview: string };
 
 async function uploadProductImage(file: File): Promise<string> {
   const fd = new FormData();
@@ -30,6 +43,15 @@ function AdminThumb({ p }: { p: Product }) {
   );
 }
 
+function draftFromProduct(p: Product | null): DraftPhoto[] {
+  if (!p) return [];
+  return storedProductImages(p).map((url, i) => ({
+    key: `stored-${i}-${url}`,
+    kind: "stored" as const,
+    url,
+  }));
+}
+
 export function ProductsView({
   products,
   categories,
@@ -46,9 +68,7 @@ export function ProductsView({
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
   const [editing, setEditing] = useState<AdminProduct | "new" | null>(null);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [photoRemoved, setPhotoRemoved] = useState(false);
+  const [photos, setPhotos] = useState<DraftPhoto[]>([]);
   const [saving, setSaving] = useState(false);
 
   const sellable = categories.filter((c) => !c.soon);
@@ -60,42 +80,71 @@ export function ProductsView({
   }, [products, search, catFilter]);
 
   const draft = editing === "new" ? null : editing;
-  const shownPhoto = photoPreview || (!photoRemoved && draft?.image ? productImageSrc(draft) : "");
 
   useEffect(() => {
-    setPhotoFile(null);
-    setPhotoRemoved(false);
-    setPhotoPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
+    setPhotos((prev) => {
+      for (const ph of prev) {
+        if (ph.kind === "file") URL.revokeObjectURL(ph.preview);
+      }
+      return draftFromProduct(editing === "new" || !editing ? null : editing);
     });
     setSaving(false);
   }, [editing]);
 
-  function pickPhoto(file: File | undefined) {
-    if (!file) return;
-    if (!PRODUCT_IMAGE_MIMES.includes(file.type as (typeof PRODUCT_IMAGE_MIMES)[number])) {
-      toast("فقط فایل JPEG، PNG یا WebP مجاز است");
+  function pickPhotos(files: FileList | File[] | null | undefined) {
+    if (!files?.length) return;
+    const room = PRODUCT_IMAGES_MAX - photos.length;
+    if (room <= 0) {
+      toast(`حداکثر ${PRODUCT_IMAGES_MAX} عکس مجاز است`);
       return;
     }
-    if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
-      toast("حجم عکس حداکثر ۲ مگابایت است");
-      return;
+    const next: DraftPhoto[] = [];
+    for (const file of Array.from(files).slice(0, room)) {
+      if (!PRODUCT_IMAGE_MIMES.includes(file.type as (typeof PRODUCT_IMAGE_MIMES)[number])) {
+        toast("فقط فایل JPEG، PNG یا WebP مجاز است");
+        continue;
+      }
+      if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+        toast("حجم هر عکس حداکثر ۲ مگابایت است");
+        continue;
+      }
+      next.push({
+        key: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind: "file",
+        file,
+        preview: URL.createObjectURL(file),
+      });
     }
-    setPhotoPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
-    });
-    setPhotoFile(file);
-    setPhotoRemoved(false);
+    if (next.length) setPhotos((prev) => [...prev, ...next].slice(0, PRODUCT_IMAGES_MAX));
   }
 
-  function clearPhoto() {
-    setPhotoFile(null);
-    setPhotoRemoved(true);
-    setPhotoPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
+  function removePhoto(key: string) {
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.key === key);
+      if (target?.kind === "file") URL.revokeObjectURL(target.preview);
+      return prev.filter((p) => p.key !== key);
+    });
+  }
+
+  function makeCover(key: string) {
+    setPhotos((prev) => {
+      const i = prev.findIndex((p) => p.key === key);
+      if (i <= 0) return prev;
+      const copy = [...prev];
+      const [item] = copy.splice(i, 1);
+      copy.unshift(item);
+      return copy;
+    });
+  }
+
+  function movePhoto(key: string, dir: -1 | 1) {
+    setPhotos((prev) => {
+      const i = prev.findIndex((p) => p.key === key);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+      return copy;
     });
   }
 
@@ -115,13 +164,18 @@ export function ProductsView({
     const idRaw = isNew ? (form.elements.namedItem("id") as HTMLInputElement | null)?.value.trim() : "";
     setSaving(true);
     try {
-      let image = photoRemoved ? "" : draft?.image || "";
-      if (photoFile) image = await uploadProductImage(photoFile);
+      const images: string[] = [];
+      for (const ph of photos) {
+        if (ph.kind === "stored") images.push(ph.url);
+        else images.push(await uploadProductImage(ph.file));
+      }
+      const image = images[0] || "";
       const base: AdminProduct = isNew
         ? {
             id: idRaw || `${name.split(" ").join("-")}-${Math.random().toString(36).slice(2, 5)}`,
             ic,
             image,
+            images,
             sold: 0,
             name,
             cat,
@@ -131,7 +185,7 @@ export function ProductsView({
             desc,
             available,
           }
-        : { ...(draft as AdminProduct), name, cat, sale, ic, image, price: priceRaw ? Number(priceRaw.replace(/[^\d]/g, "")) : null, badge, desc, available };
+        : { ...(draft as AdminProduct), name, cat, sale, ic, image, images, price: priceRaw ? Number(priceRaw.replace(/[^\d]/g, "")) : null, badge, desc, available };
 
       await Promise.resolve(onSave(base, isNew));
       setEditing(null);
@@ -190,7 +244,10 @@ export function ProductsView({
                         <AdminThumb p={p} />
                         <div>
                           <div className="adm-cell-main">{p.name}</div>
-                          <div className="adm-cell-sub">{p.id}</div>
+                          <div className="adm-cell-sub">
+                            {p.id}
+                            {storedProductImages(p).length > 1 ? ` · ${storedProductImages(p).length} عکس` : ""}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -230,33 +287,53 @@ export function ProductsView({
           <form onSubmit={submit}>
             <div className="form-grid cols-2">
               <div className="adm-photo-field">
-                <label>عکس محصول</label>
-                <div className="adm-photo-row">
-                  <div className={`adm-photo-preview${shownPhoto ? " has-img" : ""}`}>
-                    {shownPhoto ? <img src={shownPhoto} alt="" /> : <span className="adm-photo-empty">عکس انتخاب نشده</span>}
-                  </div>
-                  <div className="adm-photo-actions">
-                    <label className="btn btn-outline btn-sm">
-                      {shownPhoto ? "تغییر عکس" : "آپلود عکس"}
+                <label>عکس‌های محصول</label>
+                <div className="adm-photo-grid">
+                  {photos.map((ph, i) => {
+                    const src = ph.kind === "stored" ? productImagesSrc({ id: draft?.id || "x", image: ph.url, images: [ph.url] })[0] : ph.preview;
+                    return (
+                      <div key={ph.key} className={`adm-photo-tile${i === 0 ? " is-cover" : ""}`}>
+                        <img src={src} alt="" />
+                        {i === 0 ? <span className="adm-photo-cover-tag">کاور</span> : null}
+                        <div className="adm-photo-tile-actions">
+                          {i > 0 ? (
+                            <button type="button" className="btn btn-ghost btn-sm" disabled={saving} onClick={() => makeCover(ph.key)}>
+                              کاور
+                            </button>
+                          ) : null}
+                          <button type="button" className="btn btn-ghost btn-sm" disabled={saving || i === 0} onClick={() => movePhoto(ph.key, -1)} title="جابه‌جایی">
+                            ‹
+                          </button>
+                          <button type="button" className="btn btn-ghost btn-sm" disabled={saving || i === photos.length - 1} onClick={() => movePhoto(ph.key, 1)} title="جابه‌جایی">
+                            ›
+                          </button>
+                          <button type="button" className="btn btn-ghost btn-sm" disabled={saving} onClick={() => removePhoto(ph.key)}>
+                            حذف
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {photos.length < PRODUCT_IMAGES_MAX ? (
+                    <label className="adm-photo-add">
+                      <span>+ افزودن عکس</span>
                       <input
                         type="file"
                         accept={PRODUCT_IMAGE_ACCEPT}
+                        multiple
                         hidden
                         disabled={saving}
                         onChange={(e) => {
-                          pickPhoto(e.target.files?.[0]);
+                          pickPhotos(e.target.files);
                           e.target.value = "";
                         }}
                       />
                     </label>
-                    {shownPhoto ? (
-                      <button type="button" className="btn btn-ghost btn-sm" disabled={saving} onClick={clearPhoto}>
-                        حذف عکس
-                      </button>
-                    ) : null}
-                    <span className="hint">JPEG، PNG یا WebP — حداکثر ۲ مگابایت. همین عکس در فروشگاه، سبد و صفحه محصول نمایش داده می‌شود.</span>
-                  </div>
+                  ) : null}
                 </div>
+                <span className="hint">
+                  حداکثر {PRODUCT_IMAGES_MAX} عکس — JPEG، PNG یا WebP — هر کدام تا ۲ مگابایت. اولین عکس کاور است و در کارت‌ها و سبد نمایش داده می‌شود.
+                </span>
               </div>
               <div>
                 <label htmlFor="pf-name">نام محصول</label>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { adminErrorResponse, requireCan, requireStaff } from "@/lib/admin-auth";
 import { invalidateStoreCache, toProduct } from "@/lib/catalog-server";
 import { slugifyId } from "@/lib/admin-format";
-import { sanitizeProductImageUrl } from "@/lib/product-image";
+import { normalizeProductImageFields } from "@/lib/product-image";
 import { Product } from "@/models/Product";
 import { Category } from "@/models/Category";
 import type { SaleType } from "@/lib/data";
@@ -16,7 +16,7 @@ function parseProduct(body: Record<string, unknown>, isNew: boolean) {
   const ic = String(body.ic || "box").trim() || "box";
   const desc = String(body.desc || "").trim().slice(0, 800);
   const badge = String(body.badge || "").trim().slice(0, 24);
-  const image = sanitizeProductImageUrl(body.image);
+  const { image, images } = normalizeProductImageFields(body);
   const available = body.available !== false;
   let price: number | null = null;
   if (body.price !== null && body.price !== undefined && body.price !== "") {
@@ -33,7 +33,7 @@ function parseProduct(body: Record<string, unknown>, isNew: boolean) {
         .slice(0, 48) || slugifyId(name, "p")
     : String(body.id || "");
   if (!/^[a-zA-Z0-9\u0600-\u06FF_-]+$/.test(id)) throw new Error("شناسه محصول نامعتبر است");
-  return { id, name, cat, sale: sale as SaleType, ic, image, desc, badge, available, price };
+  return { id, name, cat, sale: sale as SaleType, ic, image, images, desc, badge, available, price };
 }
 
 export async function POST(req: Request) {
@@ -49,9 +49,10 @@ export async function POST(req: Request) {
     }
     const sort = (await Product.countDocuments()) + 1;
     const doc = await Product.create({ ...data, sort });
-    if (data.image) {
-      await Product.collection.updateOne({ _id: doc._id }, { $set: { image: data.image } });
-    }
+    await Product.collection.updateOne(
+      { _id: doc._id },
+      { $set: { image: data.image, images: data.images } }
+    );
     const fresh = await Product.collection.findOne({ _id: doc._id });
     invalidateStoreCache();
     return NextResponse.json({

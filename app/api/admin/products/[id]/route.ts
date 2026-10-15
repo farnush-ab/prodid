@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminErrorResponse, requireCan, requireStaff } from "@/lib/admin-auth";
 import { invalidateStoreCache, toProduct } from "@/lib/catalog-server";
-import { sanitizeProductImageUrl } from "@/lib/product-image";
+import { normalizeProductImageFields, storedProductImages } from "@/lib/product-image";
 import { deleteStoredProductImage } from "@/lib/product-image-server";
 import { Product } from "@/models/Product";
 import { Category } from "@/models/Category";
@@ -16,7 +16,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const body = (await req.json()) as Record<string, unknown>;
     const doc = await Product.findOne({ id: params.id });
     if (!doc) return NextResponse.json({ error: "محصول پیدا نشد" }, { status: 404 });
-    const prevImage = String((await Product.collection.findOne({ _id: doc._id }))?.image || "");
+    const raw = (await Product.collection.findOne({ _id: doc._id })) as {
+      image?: string;
+      images?: string[];
+    } | null;
+    const prevImages = storedProductImages({
+      id: params.id,
+      image: raw?.image,
+      images: raw?.images,
+    });
 
     if (typeof body.name === "string") doc.name = body.name.trim().slice(0, 80) || doc.name;
     if (typeof body.cat === "string") {
@@ -29,9 +37,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (typeof body.desc === "string") doc.desc = body.desc.trim().slice(0, 800);
     if (typeof body.badge === "string") doc.badge = body.badge.trim().slice(0, 24);
     if (typeof body.available === "boolean") doc.available = body.available;
-    let nextImage: string | undefined;
-    if (typeof body.image === "string") {
-      nextImage = sanitizeProductImageUrl(body.image);
+    let nextImages: string[] | undefined;
+    if (Array.isArray(body.images) || typeof body.image === "string") {
+      nextImages = normalizeProductImageFields(body).images;
     }
     if (body.price === null || body.price === "") doc.price = null;
     else if (body.price !== undefined) {
@@ -40,9 +48,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       doc.price = Math.round(n);
     }
     await doc.save();
-    if (nextImage !== undefined) {
-      if (nextImage !== prevImage) await deleteStoredProductImage(prevImage);
-      await Product.collection.updateOne({ _id: doc._id }, { $set: { image: nextImage } });
+    if (nextImages !== undefined) {
+      const removed = prevImages.filter((u) => !nextImages!.includes(u));
+      await Promise.all(removed.map((u) => deleteStoredProductImage(u)));
+      await Product.collection.updateOne(
+        { _id: doc._id },
+        { $set: { images: nextImages, image: nextImages[0] || "" } }
+      );
     }
     const fresh = await Product.collection.findOne({ _id: doc._id });
     invalidateStoreCache();
@@ -61,7 +73,12 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     requireCan(user, "products");
     const doc = await Product.findOneAndDelete({ id: params.id });
     if (!doc) return NextResponse.json({ error: "محصول پیدا نشد" }, { status: 404 });
-    await deleteStoredProductImage(doc.image);
+    const images = storedProductImages({
+      id: params.id,
+      image: doc.image,
+      images: (doc as { images?: string[] }).images,
+    });
+    await Promise.all(images.map((u) => deleteStoredProductImage(u)));
     invalidateStoreCache();
     return NextResponse.json({ ok: true });
   } catch (err) {

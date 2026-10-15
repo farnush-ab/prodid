@@ -11,7 +11,7 @@ import { Cart, useCart, cartQty, step } from "@/lib/cart";
 import { toast } from "@/lib/toast";
 import { ProductCard } from "@/components/ProductCard";
 import { useCatalog } from "@/lib/catalog-store";
-import { productImageSrc } from "@/lib/product-image";
+import { productImagesSrc } from "@/lib/product-image";
 
 const WEIGHT_CHIPS = [250, 500, 1000];
 
@@ -219,10 +219,7 @@ function ProductContent() {
         <Link href={`${pageHref("shop")}?cat=${p.cat}`}>{cat?.name || p.cat}</Link> ‹ {p.name}
       </nav>
       <div className="product-layout">
-        <div className="product-gallery">
-          <Icon name={p.ic} className="p-ico" />
-          <ProductGalleryImg p={p} />
-        </div>
+        <ProductGallery p={p} />
         <div className="product-info">
           <div className="p-meta">
             {p.badge ? <span className="badge badge-gold">{p.badge}</span> : null}
@@ -298,14 +295,52 @@ function ProductContent() {
   );
 }
 
-function ProductGalleryImg({ p }: { p: Product }) {
-  const src = productImageSrc(p);
-  const [ok, setOk] = useState(true);
+function ProductGallery({ p }: { p: Product }) {
+  const images = productImagesSrc(p);
+  const [active, setActive] = useState(0);
+  const [failed, setFailed] = useState<Record<number, boolean>>({});
+
+  const imagesKey = images.join("|");
   useEffect(() => {
-    setOk(true);
-  }, [src]);
-  if (!ok) return null;
-  return <img src={src} alt={p.name} onError={() => setOk(false)} />;
+    setActive(0);
+    setFailed({});
+  }, [p.id, imagesKey]);
+
+  const src = images[Math.min(active, images.length - 1)];
+  const showMain = src && !failed[active];
+  const thumbs = images.length > 1 ? images : [];
+
+  return (
+    <div className="product-gallery-wrap">
+      <div className="product-gallery">
+        <Icon name={p.ic} className="p-ico" />
+        {showMain ? (
+          <img
+            key={src}
+            src={src}
+            alt={p.name}
+            onError={() => setFailed((prev) => ({ ...prev, [active]: true }))}
+          />
+        ) : null}
+      </div>
+      {thumbs.length ? (
+        <div className="product-thumbs" role="tablist" aria-label="عکس‌های محصول">
+          {thumbs.map((url, i) => (
+            <button
+              key={`${url}-${i}`}
+              type="button"
+              role="tab"
+              aria-selected={i === active}
+              className={`product-thumb${i === active ? " active" : ""}`}
+              onClick={() => setActive(i)}
+            >
+              <img src={url} alt="" loading="lazy" onError={(e) => e.currentTarget.remove()} />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export default function ProductPage() {

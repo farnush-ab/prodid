@@ -9,6 +9,7 @@ export interface ProductDoc {
   sale: SaleType;
   ic: string;
   image: string;
+  images: string[];
   desc: string;
   badge: string;
   available: boolean;
@@ -26,6 +27,7 @@ const ProductSchema = new Schema<ProductDoc>(
     sale: { type: String, enum: ["w", "u"], required: true },
     ic: { type: String, default: "box" },
     image: { type: String, default: "" },
+    images: { type: [String], default: [] },
     desc: { type: String, default: "" },
     badge: { type: String, default: "" },
     available: { type: Boolean, default: true },
@@ -36,7 +38,7 @@ const ProductSchema = new Schema<ProductDoc>(
 
 function productModel(): Model<ProductDoc> {
   const cached = models.Product as Model<ProductDoc> | undefined;
-  if (cached && !cached.schema.path("image")) {
+  if (cached && (!cached.schema.path("image") || !cached.schema.path("images"))) {
     delete (mongoose.models as Record<string, unknown>).Product;
     delete (mongoose.connection.models as Record<string, unknown>).Product;
   }
