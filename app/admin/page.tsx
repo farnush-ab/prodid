@@ -470,7 +470,6 @@ export default function AdminPage() {
           recipes={settings.assistant.recipes}
           defaultOn={settings.assistant.defaultOn}
           intro={settings.assistant.intro}
-          greet={settings.assistant.greet}
           peek={settings.assistant.peek}
           products={products}
           onToggleDefault={async (value) => {
@@ -482,11 +481,11 @@ export default function AdminPage() {
               setSettings(data.settings);
             });
           }}
-          onSaveMessages={async (intro, greet, peek) => {
+          onSaveMessages={async (intro, peek) => {
             await run("پیام‌های دستیار ذخیره شد", async () => {
               const data = await adminFetch<{ settings: StoreSettings }>("/api/admin/settings", {
                 method: "PATCH",
-                body: JSON.stringify({ section: "assistant", assistant: { ...settings.assistant, intro, greet, peek } }),
+                body: JSON.stringify({ section: "assistant", assistant: { ...settings.assistant, intro, peek } }),
               });
               setSettings(data.settings);
             });

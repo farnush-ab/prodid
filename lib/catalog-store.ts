@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { BRAND, CATEGORIES, PRODUCTS, type Category, type Product } from "@/lib/data";
-import { GREET_MSG, INTRO_MSG, PEEK_MSG, RECIPES, type RecipeTip } from "@/lib/assistant-content";
+import { INTRO_MSG, PEEK_MSG, RECIPES, type RecipeTip } from "@/lib/assistant-content";
 import { DELIVERY_DAYS, DELIVERY_SLOTS } from "@/lib/order";
 import type { BrandInfo, DeliveryToggle, DeliveryZone, StoreFeatures } from "@/lib/store-settings";
 
@@ -18,7 +18,6 @@ export interface PublicCatalog {
   };
   assistant: {
     intro: string;
-    greet: string;
     peek: string;
     defaultOn: boolean;
     recipes: RecipeTip[];
@@ -45,7 +44,6 @@ export const DEFAULT_CATALOG: PublicCatalog = {
   },
   assistant: {
     intro: INTRO_MSG,
-    greet: GREET_MSG,
     peek: PEEK_MSG,
     defaultOn: true,
     recipes: RECIPES,

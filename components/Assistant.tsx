@@ -396,6 +396,11 @@ export function Assistant() {
     }
 
     function startWalkIntro() {
+      /* همین ابتدای راه‌رفتن علامت می‌خورد، نه آخرش: اگر کاربر وسط
+         انیمیشن صفحه را عوض کند یا ببندد، دفعه بعد دیگر تکرار نمی‌شود. */
+      stateRef.current.walked = true;
+      saveState();
+
       const el = spawnMoment(
         "",
         `
@@ -432,8 +437,6 @@ export function Assistant() {
         if (moving) moving.outerHTML = `<img class="as-walk-img as-waving" src="${WAVE_IMG}" alt="">`;
         bubble.hidden = false;
         requestAnimationFrame(() => bubble.classList.add("in"));
-        stateRef.current.walked = true;
-        saveState();
         wt(() => endMoment(false), 5200);
       };
     }

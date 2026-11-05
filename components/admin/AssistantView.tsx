@@ -9,7 +9,6 @@ export function AssistantView({
   recipes,
   defaultOn,
   intro: introProp,
-  greet: greetProp,
   peek: peekProp,
   products,
   onToggleDefault,
@@ -20,16 +19,14 @@ export function AssistantView({
   recipes: RecipeTip[];
   defaultOn: boolean;
   intro: string;
-  greet: string;
   peek: string;
   products: Product[];
   onToggleDefault: (value: boolean) => void;
-  onSaveMessages: (intro: string, greet: string, peek: string) => void;
+  onSaveMessages: (intro: string, peek: string) => void;
   onSave: (recipe: RecipeTip, index: number | null) => void;
   onDelete: (index: number) => void;
 }) {
   const [intro, setIntro] = useState(introProp);
-  const [greet, setGreet] = useState(greetProp);
   const [peek, setPeek] = useState(peekProp);
   const [editing, setEditing] = useState<{ index: number | null; recipe: RecipeTip } | null>(null);
 
@@ -65,16 +62,12 @@ export function AssistantView({
           style={{ padding: 18 }}
           onSubmit={(e) => {
             e.preventDefault();
-            onSaveMessages(intro, greet, peek);
+            onSaveMessages(intro, peek);
           }}
         >
           <div>
             <label htmlFor="as-intro">پیام خوش‌آمد اول ورود</label>
             <input id="as-intro" value={intro} onChange={(e) => setIntro(e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="as-greet">پیام دعوت دوباره</label>
-            <input id="as-greet" value={greet} onChange={(e) => setGreet(e.target.value)} />
           </div>
           <div>
             <label htmlFor="as-peek">پیام حضور در گوشه صفحه</label>

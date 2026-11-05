@@ -1,6 +1,6 @@
 import { BRAND } from "@/lib/data";
 import { DELIVERY_DAYS, DELIVERY_SLOTS } from "@/lib/order";
-import { GREET_MSG, INTRO_MSG, PEEK_MSG, RECIPES, type RecipeTip } from "@/lib/assistant-content";
+import { INTRO_MSG, PEEK_MSG, RECIPES, type RecipeTip } from "@/lib/assistant-content";
 import { OTP_DEFAULTS, type OtpLimits } from "@/lib/otp-config";
 import type { DeliveryDay, DeliverySlot } from "@/lib/order";
 
@@ -43,7 +43,6 @@ export interface PaymentDetails {
 
 export interface AssistantSettings {
   intro: string;
-  greet: string;
   peek: string;
   defaultOn: boolean;
   recipes: RecipeTip[];
@@ -75,7 +74,6 @@ export const DEFAULT_SETTINGS: StoreSettings = {
   },
   assistant: {
     intro: INTRO_MSG,
-    greet: GREET_MSG,
     peek: PEEK_MSG,
     defaultOn: true,
     recipes: RECIPES.map((r) => ({ ...r, keys: [...r.keys], products: [...r.products] })),
