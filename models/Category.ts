@@ -5,6 +5,7 @@ export interface CategoryDoc {
   name: string;
   ic: string;
   soon: boolean;
+  image: string;
   sort: number;
   createdAt: Date;
   updatedAt: Date;
@@ -16,6 +17,7 @@ const CategorySchema = new Schema<CategoryDoc>(
     name: { type: String, required: true },
     ic: { type: String, default: "box" },
     soon: { type: Boolean, default: false },
+    image: { type: String, default: "" },
     sort: { type: Number, default: 0, index: true },
   },
   { timestamps: true }

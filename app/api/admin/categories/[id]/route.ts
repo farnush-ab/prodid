@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { adminErrorResponse, requireCan, requireStaff } from "@/lib/admin-auth";
 import { invalidateStoreCache } from "@/lib/catalog-server";
+import { sanitizeCategoryImageUrl } from "@/lib/category-image";
 import { Category } from "@/models/Category";
 import { Product } from "@/models/Product";
 
@@ -16,9 +17,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (typeof body.name === "string") doc.name = body.name.trim().slice(0, 60) || doc.name;
     if (typeof body.ic === "string") doc.ic = body.ic.trim() || doc.ic;
     if (typeof body.soon === "boolean") doc.soon = body.soon;
+    if (typeof body.image === "string") doc.image = sanitizeCategoryImageUrl(body.image);
     await doc.save();
     invalidateStoreCache();
-    return NextResponse.json({ category: { id: doc.id, name: doc.name, ic: doc.ic, soon: doc.soon } });
+    return NextResponse.json({
+      category: { id: doc.id, name: doc.name, ic: doc.ic, soon: doc.soon, image: doc.image || "" },
+    });
   } catch (err) {
     return adminErrorResponse(err);
   }

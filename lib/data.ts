@@ -12,6 +12,8 @@ export interface Category {
   name: string;
   ic: string;
   soon: boolean;
+  /** عکس دسته؛ اگر خالی باشد از /assets/img/categories/{id}.jpg استفاده می‌شود */
+  image?: string;
 }
 
 export interface Product {

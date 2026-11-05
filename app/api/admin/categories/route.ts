@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminErrorResponse, requireCan, requireStaff } from "@/lib/admin-auth";
 import { invalidateStoreCache } from "@/lib/catalog-server";
 import { slugifyId } from "@/lib/admin-format";
+import { sanitizeCategoryImageUrl } from "@/lib/category-image";
 import { Category } from "@/models/Category";
 import { Product } from "@/models/Product";
 
@@ -16,6 +17,7 @@ export async function POST(req: Request) {
     if (!name) return NextResponse.json({ error: "نام دسته لازم است" }, { status: 400 });
     const ic = String(body.ic || "box").trim() || "box";
     const soon = !!body.soon;
+    const image = sanitizeCategoryImageUrl(body.image);
     const id =
       String(body.id || "")
         .trim()
@@ -25,9 +27,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "شناسه دسته تکراری است" }, { status: 400 });
     }
     const sort = (await Category.countDocuments()) + 1;
-    const doc = await Category.create({ id, name, ic, soon, sort });
+    const doc = await Category.create({ id, name, ic, soon, image, sort });
     invalidateStoreCache();
-    return NextResponse.json({ category: { id: doc.id, name: doc.name, ic: doc.ic, soon: doc.soon } });
+    return NextResponse.json({
+      category: { id: doc.id, name: doc.name, ic: doc.ic, soon: doc.soon, image: doc.image || "" },
+    });
   } catch (err) {
     return adminErrorResponse(err);
   }

@@ -46,8 +46,8 @@ export function toProduct(doc: {
   };
 }
 
-function toCategory(doc: { id: string; name: string; ic: string; soon: boolean }): Category {
-  return { id: doc.id, name: doc.name, ic: doc.ic, soon: doc.soon };
+function toCategory(doc: { id: string; name: string; ic: string; soon: boolean; image?: string | null }): Category {
+  return { id: doc.id, name: doc.name, ic: doc.ic, soon: doc.soon, image: (doc.image || "").trim() };
 }
 
 function omitUndef<T extends object>(obj?: T | null): Partial<T> {
