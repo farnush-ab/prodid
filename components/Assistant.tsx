@@ -27,7 +27,10 @@ const AKEY = "prodid_assistant";
 
 interface AState {
   disabled?: boolean;
+  /** شخصیت یک‌بار در صفحه اصلی راه رفته — دیگر تکرار نمی‌شود */
   walked?: boolean;
+  /** شخصیت یک‌بار در صفحه محصول سرک کشیده — دیگر تکرار نمی‌شود */
+  peeked?: boolean;
 }
 
 function norm(s: string) {
@@ -435,26 +438,6 @@ export function Assistant() {
       };
     }
 
-    function popGreet() {
-      const el = spawnMoment(
-        "as-pop",
-        `
-        <div class="as-walk-bubble" hidden>
-          <b>دستیار هوشمند پرودید</b>
-          <span>${getCatalogSnapshot().assistant.greet}</span>
-        </div>
-        <img class="as-walk-img as-waving" src="${WAVE_IMG}" alt="دستیار هوشمند پرودید">`
-      );
-      requestAnimationFrame(() => el.classList.add("in"));
-      const bubble = el.querySelector(".as-walk-bubble") as HTMLDivElement;
-      wt(() => {
-        if (!walkerRef.current) return;
-        bubble.hidden = false;
-        requestAnimationFrame(() => bubble.classList.add("in"));
-      }, 700);
-      wt(() => endMoment(false), 5200);
-    }
-
     function peekProduct() {
       const el = spawnMoment(
         "as-peek",
@@ -474,7 +457,7 @@ export function Assistant() {
       wt(() => endMoment(false), 4800);
     }
 
-    (refs.current as any).trigger = { startWalkIntro, popGreet, peekProduct, REDUCED };
+    (refs.current as any).trigger = { startWalkIntro, peekProduct, REDUCED, saveState };
 
     return () => {
       walkTimers.current.forEach(clearTimeout);
@@ -485,7 +468,9 @@ export function Assistant() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* هر بار مسیر عوض شود، معادل «بار جدید صفحه» رفتار حضور شخصیت را دوباره اجرا می‌کنیم */
+  /* حضور شخصیت فقط «یک بار برای همیشه» است و در بازدیدهای بعدی تکرار
+     نمی‌شود: یک بار راه‌رفتن در صفحه اصلی، و یک بار سرک‌کشیدن در اولین
+     صفحه محصول. بعد از آن فقط دکمه شناور دستیار در دسترس می‌ماند. */
   useEffect(() => {
     const t = (refs.current as any)?.trigger;
     if (!t || t.REDUCED) return;
@@ -494,6 +479,7 @@ export function Assistant() {
     const page = !pathname || pathname === "/" ? "index" : pathname.split("/")[1] || "index";
 
     if (page === "index") {
+      if (stateRef.current.walked) return;
       const hero = document.querySelector(".hero");
       if (hero && "IntersectionObserver" in window) {
         let started = false;
@@ -503,8 +489,7 @@ export function Assistant() {
               if (!e.isIntersecting && !started) {
                 started = true;
                 io.disconnect();
-                if (stateRef.current.walked) t.popGreet();
-                else t.startWalkIntro();
+                t.startWalkIntro();
               }
             });
           },
@@ -514,9 +499,14 @@ export function Assistant() {
         return () => io.disconnect();
       }
     } else if (page === "product") {
+      if (stateRef.current.peeked) return;
       const timer = setTimeout(() => {
         const panel = refs.current?.panel;
-        if (panel && !panel.classList.contains("in")) t.peekProduct();
+        if (panel && !panel.classList.contains("in")) {
+          stateRef.current.peeked = true;
+          t.saveState?.();
+          t.peekProduct();
+        }
       }, 5000);
       return () => clearTimeout(timer);
     }
