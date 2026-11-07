@@ -4,14 +4,17 @@
    معادل showVpnNotice() در app.js */
 import { useEffect, useState } from "react";
 import { Icon } from "@/lib/icons";
+import { useCatalog } from "@/lib/catalog-store";
 
 const VPN_NOTICE_KEY = "prodid_vpn_notice";
 
 export function VpnNotice() {
+  const { features } = useCatalog();
   const [visible, setVisible] = useState(false);
   const [show, setShow] = useState(false);
 
   useEffect(() => {
+    if (!features.vpnNotice) return;
     try {
       if (sessionStorage.getItem(VPN_NOTICE_KEY)) return;
     } catch {
@@ -27,7 +30,7 @@ export function VpnNotice() {
       cancelAnimationFrame(raf);
       document.removeEventListener("keydown", onKey);
     };
-  }, []);
+  }, [features.vpnNotice]);
 
   function close() {
     try {
@@ -39,7 +42,7 @@ export function VpnNotice() {
     setTimeout(() => setVisible(false), 300);
   }
 
-  if (!visible) return null;
+  if (!visible || !features.vpnNotice) return null;
 
   return (
     <div

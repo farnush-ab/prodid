@@ -9,6 +9,12 @@
 import { CATEGORIES as REAL_CATEGORIES, PRODUCTS as REAL_PRODUCTS } from "./data";
 import type { Category, Product } from "./data";
 import { DELIVERY_DAYS, DELIVERY_SLOTS, type PublicOrder } from "./order";
+import { OTP_DEFAULTS } from "./otp-config";
+import type { StaffRole } from "@/lib/roles";
+
+export { OTP_DEFAULTS };
+export type { StaffRole as TeamRole } from "@/lib/roles";
+export { TEAM_ROLE_LABEL } from "@/lib/roles";
 
 export function cloneCategories(): Category[] {
   return REAL_CATEGORIES.map((c) => ({ ...c }));
@@ -30,6 +36,14 @@ export interface AdminOrder extends PublicOrder {
 /* آیا سفارش امروز ثبت شده — بر اساس زمان واقعی ثبت (createdAt/createdLabel)،
    نه روز تحویل انتخابی مشتری (day) که می‌تواند برای سفارش‌های قدیمی هم «امروز»/«فردا» باشد */
 export function isCreatedToday(order: AdminOrder): boolean {
+  const iso = order.createdAt;
+  if (iso) {
+    const d = new Date(iso);
+    if (!Number.isNaN(d.getTime())) {
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    }
+  }
   return !order.createdLabel.includes("دیروز") && !order.createdLabel.includes("روز پیش");
 }
 
@@ -108,6 +122,8 @@ export const ADMIN_ORDERS: AdminOrder[] = [
 export interface AdminCustomer {
   name: string;
   phone: string;
+  address?: string;
+  birthDate?: string;
   orders: number;
   spent: number;
   last: string;
@@ -124,10 +140,9 @@ export const ADMIN_CUSTOMERS: AdminCustomer[] = [
   { name: "رضا قاسمی", phone: "09301239988", orders: 1, spent: 170000, last: "دیروز", status: "blocked" },
 ];
 
-/* بازه‌های OTP مطابق مقادیر واقعی lib/otp.ts (اینجا فقط برای پیش‌نمایش/ویرایش تکرار شده، چون آن فایل از crypto سمت سرور استفاده می‌کند) */
-export const OTP_DEFAULTS = { ttlMinutes: 2, resendSeconds: 60, windowHours: 1, maxSends: 5, maxAttempts: 5 };
+/* بازه‌های OTP مطابق مقادیر واقعی lib/otp.ts */
 
-export interface OtpLogEntry { phone: string; time: string; attempts: number; result: "ok" | "blocked" | "expired" }
+export interface OtpLogEntry { phone: string; time: string; attempts: number; result: "ok" | "blocked" | "expired" | "fail" }
 export const OTP_LOG: OtpLogEntry[] = [
   { phone: "09121234567", time: "۱۴:۲۰", attempts: 1, result: "ok" },
   { phone: "09135557788", time: "۱۳:۵۴", attempts: 1, result: "ok" },
@@ -138,11 +153,7 @@ export const OTP_LOG: OtpLogEntry[] = [
 ];
 export const INITIAL_BLOCKED_PHONES = ["09190001122"];
 
-export type TeamRole = "owner" | "orders" | "catalog" | "support";
-export const TEAM_ROLE_LABEL: Record<TeamRole, string> = {
-  owner: "مالک — دسترسی کامل", orders: "مدیر سفارش‌ها", catalog: "مدیر کاتالوگ", support: "پشتیبانی",
-};
-export interface TeamMember { name: string; phone: string; role: TeamRole; active: string; status: "active" | "suspended" }
+export interface TeamMember { name: string; phone: string; role: StaffRole; active: string; status: "active" | "suspended" }
 export const ADMIN_TEAM: TeamMember[] = [
   { name: "عاطفه رستمی", phone: "09130612019", role: "owner", active: "اکنون", status: "active" },
   { name: "یاسمن قربانی", phone: "09121110099", role: "orders", active: "۲۰ دقیقه پیش", status: "active" },

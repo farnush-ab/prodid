@@ -14,3 +14,10 @@ export function normalizePhone(input: string): string | null {
   if (/^09\d{9}$/.test(phone)) return phone;
   return null;
 }
+
+/** ۰۹xxxxxxxxx → 98xxxxxxxxx برای واتس‌اپ */
+export function phoneToIntl(input: string): string {
+  const phone = normalizePhone(input);
+  if (!phone) return String(input).replace(/\D/g, "");
+  return `98${phone.slice(1)}`;
+}

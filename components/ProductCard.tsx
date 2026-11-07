@@ -1,24 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/lib/icons";
 import type { Product } from "@/lib/data";
-import { BRAND } from "@/lib/data";
 import { fmtPrice, unitLabel, qtyLabel, toFa, parseIntFa } from "@/lib/format";
 import { pageHref } from "@/lib/page";
 import { Cart, useCart, cartQty, step } from "@/lib/cart";
 import { toast } from "@/lib/toast";
 import { useReveal, staggerDelay } from "@/components/Reveal";
+import { useCatalog } from "@/lib/catalog-store";
+import { productImageSrc } from "@/lib/product-image";
 
 function ProductImg({ p, cls = "p-img" }: { p: Product; cls?: string }) {
+  const src = productImageSrc(p);
   const [ok, setOk] = useState(true);
+  useEffect(() => {
+    setOk(true);
+  }, [src]);
   return (
     <div className={cls}>
       <Icon name={p.ic} className="p-ico" />
       {ok && (
         <img
-          src={`/assets/img/products/${p.id}.jpg`}
+          src={src}
           alt={p.name}
           loading="lazy"
           onError={() => setOk(false)}
@@ -105,6 +110,14 @@ function UnitStepper({ p, qty }: { p: Product; qty: number }) {
 
 function CardAction({ p }: { p: Product }) {
   const inCart = cartQty(useCart(), p.id);
+  const { brand, features } = useCatalog();
+  if (features.maintenance) {
+    return (
+      <button className="p-add out" disabled title="فروشگاه در حال به‌روزرسانی است">
+        <Icon name="clock" />
+      </button>
+    );
+  }
   if (!p.available) {
     return (
       <button className="p-add out" disabled title="ناموجود">
@@ -114,7 +127,7 @@ function CardAction({ p }: { p: Product }) {
   }
   if (p.price === null) {
     return (
-      <a className="p-add" href={`tel:${BRAND.phone}`} title="تماس برای سفارش">
+      <a className="p-add" href={`tel:${brand.phone}`} title="تماس برای سفارش">
         <Icon name="phone" />
       </a>
     );

@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { fmtPrice } from "@/lib/format";
-import { BRAND } from "@/lib/data";
-import { toast } from "@/lib/toast";
 import type { DeliveryZone } from "@/lib/admin-data";
 
 interface ToggleItem {
@@ -16,21 +14,36 @@ export function DeliveryView({
   days,
   slots,
   zones,
+  minOrder,
+  deliveryNote,
   onToggleDay,
   onToggleSlot,
-  onAddZone,
-  onRemoveZone,
+  onSaveZones,
+  onSaveLimits,
 }: {
   days: ToggleItem[];
   slots: ToggleItem[];
   zones: DeliveryZone[];
+  minOrder: number;
+  deliveryNote: string;
   onToggleDay: (id: string, value: boolean) => void;
   onToggleSlot: (id: string, value: boolean) => void;
-  onAddZone: () => void;
-  onRemoveZone: (index: number) => void;
+  onSaveZones: (zones: DeliveryZone[]) => void;
+  onSaveLimits: (minOrder: number, note: string) => void;
 }) {
-  const [minOrder, setMinOrder] = useState(String(BRAND.minOrder));
-  const [note, setNote] = useState(BRAND.deliveryFeeNote);
+  const [draftZones, setDraftZones] = useState(zones);
+  const [min, setMin] = useState(String(minOrder));
+  const [note, setNote] = useState(deliveryNote);
+
+  useEffect(() => {
+    setDraftZones(zones);
+    setMin(String(minOrder));
+    setNote(deliveryNote);
+  }, [zones, minOrder, deliveryNote]);
+
+  function syncZones(next: DeliveryZone[]) {
+    setDraftZones(next);
+  }
 
   return (
     <div>
@@ -78,7 +91,11 @@ export function DeliveryView({
         <div className="adm-card">
           <div className="adm-card-head">
             <h3>مناطق و هزینه ارسال</h3>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onAddZone}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => syncZones([...draftZones, { name: "منطقه جدید", fee: 0 }])}
+            >
               + افزودن منطقه
             </button>
           </div>
@@ -92,12 +109,25 @@ export function DeliveryView({
                 </tr>
               </thead>
               <tbody>
-                {zones.map((z, i) => (
+                {draftZones.map((z, i) => (
                   <tr key={i}>
-                    <td>{z.name}</td>
-                    <td>{fmtPrice(z.fee)}</td>
                     <td>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => onRemoveZone(i)}>
+                      <input
+                        value={z.name}
+                        onChange={(e) => syncZones(draftZones.map((row, idx) => (idx === i ? { ...row, name: e.target.value } : row)))}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        dir="ltr"
+                        value={z.fee}
+                        onChange={(e) =>
+                          syncZones(draftZones.map((row, idx) => (idx === i ? { ...row, fee: Number(e.target.value.replace(/[^\d]/g, "")) || 0 } : row)))
+                        }
+                      />
+                    </td>
+                    <td>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => syncZones(draftZones.filter((_, idx) => idx !== i))}>
                         حذف
                       </button>
                     </td>
@@ -106,18 +136,23 @@ export function DeliveryView({
               </tbody>
             </table>
           </div>
+          <div style={{ padding: 18 }}>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => onSaveZones(draftZones)}>
+              ذخیره مناطق
+            </button>
+          </div>
         </div>
         <div className="adm-card adm-card-pad">
           <form
             className="form-grid"
             onSubmit={(e) => {
               e.preventDefault();
-              toast("تنظیمات ارسال ذخیره شد");
+              onSaveLimits(Number(min.replace(/[^\d]/g, "")) || 0, note.trim());
             }}
           >
             <div>
               <label htmlFor="min-order">حداقل مبلغ سفارش (تومان)</label>
-              <input id="min-order" dir="ltr" value={minOrder} onChange={(e) => setMinOrder(e.target.value)} />
+              <input id="min-order" dir="ltr" value={min} onChange={(e) => setMin(e.target.value)} />
             </div>
             <div>
               <label htmlFor="delivery-note">یادداشت هزینه ارسال</label>

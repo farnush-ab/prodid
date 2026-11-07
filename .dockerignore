@@ -1,0 +1,27 @@
+node_modules
+.next
+out
+build
+
+.git
+.cursor
+.vscode
+.idea
+
+# Secrets stay on the host and are passed in at runtime.
+.env
+.env.*
+!.env.example
+
+uploads
+public/uploads
+
+*.md
+docs
+scripts
+npm-debug.log*
+.DS_Store
+Thumbs.db
+Dockerfile
+docker-compose.yml
+.dockerignore

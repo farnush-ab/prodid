@@ -80,7 +80,7 @@ export function LoginPanel({
       setStep("otp");
       setCode("");
       setWait(RESEND_SEC);
-      toast("کد تایید در کنسول سرور ثبت شد");
+      toast(data.sms ? "کد تایید پیامک شد" : "کد تایید صادر شد");
     } catch {
       toast("ارتباط با سرور برقرار نشد");
     } finally {
@@ -193,7 +193,7 @@ export function LoginPanel({
               تغییر شماره
             </button>
           </div>
-          <p className="muted mt-2">فعلا پیامک ارسال نمی‌شود؛ کد در کنسول سرور (ترمینال Next.js) چاپ می‌شود.</p>
+          <p className="muted mt-2">کد تایید به شماره شما پیامک می‌شود.</p>
         </div>
       )}
 

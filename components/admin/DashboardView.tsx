@@ -3,10 +3,11 @@
 import { Icon } from "@/lib/icons";
 import { fmtPrice, faNum } from "@/lib/format";
 import type { AdminOrder } from "@/lib/admin-data";
-import { REVENUE_SERIES, isCreatedToday } from "@/lib/admin-data";
-import type { Product } from "@/lib/data";
+import { isCreatedToday } from "@/lib/admin-data";
+import type { Category, Product } from "@/lib/data";
 import type { OrderStatus } from "@/lib/order";
 import type { AdminView } from "./AdminShell";
+import { orderPayable } from "@/lib/coupon";
 import { StatusPill } from "./shared";
 import { RevenueChart } from "./RevenueChart";
 import { CategoryBars } from "./CategoryBars";
@@ -14,18 +15,35 @@ import { CategoryBars } from "./CategoryBars";
 export function DashboardView({
   orders,
   products,
+  revenueSeries,
+  greetingName,
+  categories,
   onNavigate,
   onDrillToOrders,
 }: {
   orders: AdminOrder[];
   products: (Product & { sold: number })[];
+  revenueSeries: number[];
+  greetingName?: string;
+  categories: Category[];
   onNavigate: (v: AdminView) => void;
   onDrillToOrders: (status: OrderStatus | "all") => void;
 }) {
   const pendingCount = orders.filter((o) => o.status === "pending").length;
   const activeCount = orders.filter((o) => ["confirmed", "preparing", "delivering"].includes(o.status)).length;
   const todayOrders = orders.filter(isCreatedToday);
-  const todayRevenue = todayOrders.filter((o) => o.status !== "cancelled").reduce((s, o) => s + o.estimatedTotal, 0);
+  const todayRevenue = todayOrders.filter((o) => o.status !== "cancelled").reduce((s, o) => s + orderPayable(o), 0);
+  const yesterdayRev = revenueSeries.length >= 2 ? revenueSeries[revenueSeries.length - 2] : 0;
+  const revDelta = yesterdayRev ? Math.round(((todayRevenue - yesterdayRev) / yesterdayRev) * 100) : 0;
+  const yesterdayCount = (() => {
+    const y = new Date();
+    y.setDate(y.getDate() - 1);
+    return orders.filter((o) => {
+      const d = new Date(o.createdAt);
+      return d.getFullYear() === y.getFullYear() && d.getMonth() === y.getMonth() && d.getDate() === y.getDate();
+    }).length;
+  })();
+  const countDelta = todayOrders.length - yesterdayCount;
   const unpaidCard = orders.filter((o) => o.paymentMethod !== "cod" && o.paymentStatus === "unpaid" && o.status !== "cancelled").length;
   const unavailable = products.filter((p) => !p.available).length;
 
@@ -34,8 +52,8 @@ export function DashboardView({
       label: "فروش امروز",
       value: fmtPrice(todayRevenue),
       unit: "تومان",
-      delta: "۱۲٪+ نسبت به دیروز",
-      tone: "up" as const,
+      delta: revDelta ? `${Math.abs(revDelta)}٪${revDelta > 0 ? "+" : "−"} نسبت به دیروز` : "نسبت به دیروز",
+      tone: revDelta > 0 ? ("up" as const) : revDelta < 0 ? ("alert" as const) : ("flat" as const),
       icon: "wallet",
       bg: "var(--brand-green-tint)",
       fg: "var(--brand-green-deep)",
@@ -45,8 +63,8 @@ export function DashboardView({
       label: "سفارش‌های امروز",
       value: faNum.format(todayOrders.length),
       unit: "سفارش",
-      delta: "۲+ نسبت به دیروز",
-      tone: "up" as const,
+      delta: countDelta ? `${countDelta > 0 ? "+" : ""}${faNum.format(countDelta)} نسبت به دیروز` : "بدون تغییر نسبت به دیروز",
+      tone: countDelta > 0 ? ("up" as const) : countDelta < 0 ? ("alert" as const) : ("flat" as const),
       icon: "package",
       bg: "var(--wine-tint)",
       fg: "var(--wine)",
@@ -109,7 +127,7 @@ export function DashboardView({
     <div>
       <div className="adm-page-head">
         <div>
-          <h1>سلام عاطفه‌جان 👋</h1>
+          <h1>سلام{greetingName?.trim() ? ` ${greetingName.trim().split(" ")[0]}‌جان` : ""} 👋</h1>
           <p>خلاصه امروز فروشگاه پرودید — از هر کارت می‌توانید مستقیم وارد همان بخش شوید</p>
         </div>
         <button type="button" className="btn btn-outline btn-sm" onClick={() => onNavigate("reports")}>
@@ -145,10 +163,10 @@ export function DashboardView({
               <div className="sub">جمع مبلغ سفارش‌های نهایی‌شده، به تومان</div>
             </div>
             <span className="adm-pill adm-pill-done">
-              <span className="dot" /> ۱۸٪+ نسبت به بازه قبل
+              <span className="dot" /> ۱۴ روز اخیر
             </span>
           </div>
-          <RevenueChart data={REVENUE_SERIES} />
+          <RevenueChart data={revenueSeries.length ? revenueSeries : [0, 0]} />
         </div>
 
         <div className="adm-card">
@@ -203,7 +221,7 @@ export function DashboardView({
                       <div className="adm-cell-main">{o.orderNo}</div>
                       <div className="adm-cell-sub">{o.customer.name}</div>
                     </td>
-                    <td className="amount">{fmtPrice(o.estimatedTotal)} تومان</td>
+                    <td className="amount">{fmtPrice(orderPayable(o))} تومان</td>
                     <td>
                       <StatusPill status={o.status} />
                     </td>
@@ -220,7 +238,7 @@ export function DashboardView({
               <div className="sub">۳۰ روز اخیر</div>
             </div>
           </div>
-          <CategoryBars products={products} />
+          <CategoryBars products={products} categories={categories} />
         </div>
       </div>
     </div>

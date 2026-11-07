@@ -1,30 +1,35 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Icon } from "@/lib/icons";
-import { CATEGORIES, PRODUCTS, type SaleType } from "@/lib/data";
+import { type SaleType } from "@/lib/data";
 import { faNum } from "@/lib/format";
 import { ProductCard } from "@/components/ProductCard";
-
-const CATS = [{ id: "all", name: "همه" }, ...CATEGORIES.filter((c) => !c.soon)];
+import { useCatalog } from "@/lib/catalog-store";
 
 type SortKey = "default" | "price-asc" | "price-desc" | "name";
 
 function ShopContent() {
+  const { products, categories } = useCatalog();
+  const CATS = [{ id: "all", name: "همه" }, ...categories.filter((c) => !c.soon)];
   const params = useSearchParams();
+  const q = (params?.get("q") || "").trim();
   const [cat, setCat] = useState(params?.get("cat") || "all");
-  const [q] = useState(params?.get("q") || "");
   const [type, setType] = useState<"all" | SaleType>("all");
   const [sort, setSort] = useState<SortKey>("default");
   const [onlyAvailable, setOnlyAvailable] = useState(false);
 
+  // جست‌وجوی جدید از هدر → فیلتر دستهٔ قبلی را رها کن تا نتیجه خالی نشود
+  useEffect(() => {
+    if (q) setCat("all");
+  }, [q]);
+
   const list = useMemo(() => {
-    let l = PRODUCTS.slice();
+    let l = products.slice();
     if (cat !== "all") l = l.filter((p) => p.cat === cat);
     if (q) {
-      const query = q.trim();
-      l = l.filter((p) => p.name.includes(query) || (p.desc || "").includes(query));
+      l = l.filter((p) => p.name.includes(q) || (p.desc || "").includes(q));
     }
     if (type !== "all") l = l.filter((p) => p.sale === type);
     if (onlyAvailable) l = l.filter((p) => p.available);
@@ -33,7 +38,7 @@ function ShopContent() {
     if (sort === "price-desc") l.sort((a, b) => (b.price ?? -1) - (a.price ?? -1));
     if (sort === "name") l.sort((a, b) => a.name.localeCompare(b.name, "fa"));
     return l;
-  }, [cat, q, type, sort, onlyAvailable]);
+  }, [cat, q, type, sort, onlyAvailable, products]);
 
   return (
     <>

@@ -2,13 +2,21 @@ import type { Metadata } from "next";
 import { Icon } from "@/lib/icons";
 import { BRAND } from "@/lib/data";
 import { toFa } from "@/lib/format";
+import { getStoreSettings } from "@/lib/catalog-server";
 
 export const metadata: Metadata = {
   title: "تماس با ما | پرودید",
   description: "راه‌های ارتباط با فروشگاه پرودید کاشان؛ تلفن، واتس‌اپ، اینستاگرام و آدرس فروشگاه.",
 };
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  let brand = BRAND;
+  try {
+    const settings = await getStoreSettings();
+    brand = settings.brand;
+  } catch {
+    /* دادهٔ استاتیک */
+  }
   return (
     <>
       <div className="page-head">
@@ -30,7 +38,7 @@ export default function ContactPage() {
               </span>
               <div>
                 <b>آدرس فروشگاه</b>
-                <span>{BRAND.address}</span>
+                <span>{brand.address}</span>
               </div>
             </div>
             <div className="contact-line">
@@ -39,7 +47,7 @@ export default function ContactPage() {
               </span>
               <div>
                 <b>تلفن سفارش</b>
-                <a href={`tel:${BRAND.phone}`}>{toFa(BRAND.phone)}</a>
+                <a href={`tel:${brand.phone}`}>{toFa(brand.phone)}</a>
               </div>
             </div>
             <div className="contact-line">
@@ -48,7 +56,7 @@ export default function ContactPage() {
               </span>
               <div>
                 <b>واتس‌اپ</b>
-                <a href={`https://wa.me/${BRAND.phoneIntl}`} target="_blank" rel="noopener">
+                <a href={`https://wa.me/${brand.phoneIntl}`} target="_blank" rel="noopener">
                   ارسال پیام در واتس‌اپ
                 </a>
               </div>
@@ -59,8 +67,8 @@ export default function ContactPage() {
               </span>
               <div>
                 <b>اینستاگرام</b>
-                <a href={BRAND.instagramUrl} target="_blank" rel="noopener">
-                  {BRAND.instagram}@
+                <a href={brand.instagramUrl} target="_blank" rel="noopener">
+                  {brand.instagram}@
                 </a>
               </div>
             </div>
@@ -74,10 +82,10 @@ export default function ContactPage() {
               </div>
             </div>
             <div className="mt-2">
-              <a className="btn btn-primary btn-block" href={`tel:${BRAND.phone}`}>
+              <a className="btn btn-primary btn-block" href={`tel:${brand.phone}`}>
                 <Icon name="phone" /> تماس مستقیم
               </a>
-              <a className="btn btn-outline btn-block mt-1" href={`https://wa.me/${BRAND.phoneIntl}`} target="_blank" rel="noopener">
+              <a className="btn btn-outline btn-block mt-1" href={`https://wa.me/${brand.phoneIntl}`} target="_blank" rel="noopener">
                 <Icon name="chat" /> پیام در واتس‌اپ
               </a>
             </div>
@@ -88,7 +96,7 @@ export default function ContactPage() {
                 <Icon name="pin" />
               </div>
               <b>فروشگاه پرودید</b>
-              <p>{BRAND.address}</p>
+              <p>{brand.address}</p>
               <a
                 className="btn btn-dark mt-2"
                 target="_blank"

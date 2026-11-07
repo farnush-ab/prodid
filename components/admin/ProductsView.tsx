@@ -1,12 +1,56 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fmtPrice } from "@/lib/format";
+import { Icon } from "@/lib/icons";
 import type { Category, Product, SaleType } from "@/lib/data";
+import {
+  PRODUCT_IMAGE_ACCEPT,
+  PRODUCT_IMAGE_MAX_BYTES,
+  PRODUCT_IMAGE_MIMES,
+  PRODUCT_IMAGES_MAX,
+  hasStoredProductImage,
+  productImageSrc,
+  productImagesSrc,
+  storedProductImages,
+} from "@/lib/product-image";
+import { toast } from "@/lib/toast";
 import { AppModal } from "@/components/AppModal";
 import { EmptyRow } from "./shared";
 
 type AdminProduct = Product & { sold: number };
+
+type DraftPhoto =
+  | { key: string; kind: "stored"; url: string }
+  | { key: string; kind: "file"; file: File; preview: string };
+
+async function uploadProductImage(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/admin/products/image", { method: "POST", body: fd });
+  const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+  if (!res.ok || !data.url) throw new Error(data.error || "آپلود عکس ناموفق بود");
+  return data.url;
+}
+
+function AdminThumb({ p }: { p: Product }) {
+  const src = hasStoredProductImage(p) ? productImageSrc(p) : "";
+  return (
+    <div className="adm-thumb">
+      <Icon name={p.ic} />
+      {src ? <img key={src} src={src} alt="" onError={(e) => e.currentTarget.remove()} /> : null}
+    </div>
+  );
+}
+
+function draftFromProduct(p: Product | null): DraftPhoto[] {
+  if (!p) return [];
+  return storedProductImages(p).map((url, i) => ({
+    key: `stored-${i}-${url}`,
+    kind: "stored" as const,
+    url,
+  }));
+}
 
 export function ProductsView({
   products,
@@ -17,13 +61,15 @@ export function ProductsView({
 }: {
   products: AdminProduct[];
   categories: Category[];
-  onSave: (product: AdminProduct, isNew: boolean) => void;
+  onSave: (product: AdminProduct, isNew: boolean) => void | Promise<void>;
   onDelete: (id: string) => void;
   onToggleAvailable: (id: string, value: boolean) => void;
 }) {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
   const [editing, setEditing] = useState<AdminProduct | "new" | null>(null);
+  const [photos, setPhotos] = useState<DraftPhoto[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const sellable = categories.filter((c) => !c.soon);
   const catName = (id: string) => categories.find((c) => c.id === id)?.name || id;
@@ -35,7 +81,74 @@ export function ProductsView({
 
   const draft = editing === "new" ? null : editing;
 
-  function submit(e: React.FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    setPhotos((prev) => {
+      for (const ph of prev) {
+        if (ph.kind === "file") URL.revokeObjectURL(ph.preview);
+      }
+      return draftFromProduct(editing === "new" || !editing ? null : editing);
+    });
+    setSaving(false);
+  }, [editing]);
+
+  function pickPhotos(files: FileList | File[] | null | undefined) {
+    if (!files?.length) return;
+    const room = PRODUCT_IMAGES_MAX - photos.length;
+    if (room <= 0) {
+      toast(`حداکثر ${PRODUCT_IMAGES_MAX} عکس مجاز است`);
+      return;
+    }
+    const next: DraftPhoto[] = [];
+    for (const file of Array.from(files).slice(0, room)) {
+      if (!PRODUCT_IMAGE_MIMES.includes(file.type as (typeof PRODUCT_IMAGE_MIMES)[number])) {
+        toast("فقط فایل JPEG، PNG یا WebP مجاز است");
+        continue;
+      }
+      if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+        toast("حجم هر عکس حداکثر ۲ مگابایت است");
+        continue;
+      }
+      next.push({
+        key: `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind: "file",
+        file,
+        preview: URL.createObjectURL(file),
+      });
+    }
+    if (next.length) setPhotos((prev) => [...prev, ...next].slice(0, PRODUCT_IMAGES_MAX));
+  }
+
+  function removePhoto(key: string) {
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.key === key);
+      if (target?.kind === "file") URL.revokeObjectURL(target.preview);
+      return prev.filter((p) => p.key !== key);
+    });
+  }
+
+  function makeCover(key: string) {
+    setPhotos((prev) => {
+      const i = prev.findIndex((p) => p.key === key);
+      if (i <= 0) return prev;
+      const copy = [...prev];
+      const [item] = copy.splice(i, 1);
+      copy.unshift(item);
+      return copy;
+    });
+  }
+
+  function movePhoto(key: string, dir: -1 | 1) {
+    setPhotos((prev) => {
+      const i = prev.findIndex((p) => p.key === key);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+      return copy;
+    });
+  }
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
@@ -45,14 +158,42 @@ export function ProductsView({
     const badge = (form.elements.namedItem("badge") as HTMLInputElement).value.trim();
     const desc = (form.elements.namedItem("desc") as HTMLTextAreaElement).value.trim();
     const available = (form.elements.namedItem("available") as HTMLInputElement).checked;
+    const ic = categories.find((c) => c.id === cat)?.ic || draft?.ic || "box";
 
     const isNew = editing === "new";
-    const base: AdminProduct = isNew
-      ? { id: `${name.split(" ").join("-")}-${Math.random().toString(36).slice(2, 5)}`, ic: catName(cat) ? categories.find((c) => c.id === cat)?.ic || "box" : "box", sold: 0, name, cat, sale, price: priceRaw ? Number(priceRaw.replace(/[^\d]/g, "")) : null, badge, desc, available }
-      : { ...(draft as AdminProduct), name, cat, sale, price: priceRaw ? Number(priceRaw.replace(/[^\d]/g, "")) : null, badge, desc, available };
+    const idRaw = isNew ? (form.elements.namedItem("id") as HTMLInputElement | null)?.value.trim() : "";
+    setSaving(true);
+    try {
+      const images: string[] = [];
+      for (const ph of photos) {
+        if (ph.kind === "stored") images.push(ph.url);
+        else images.push(await uploadProductImage(ph.file));
+      }
+      const image = images[0] || "";
+      const base: AdminProduct = isNew
+        ? {
+            id: idRaw || `${name.split(" ").join("-")}-${Math.random().toString(36).slice(2, 5)}`,
+            ic,
+            image,
+            images,
+            sold: 0,
+            name,
+            cat,
+            sale,
+            price: priceRaw ? Number(priceRaw.replace(/[^\d]/g, "")) : null,
+            badge,
+            desc,
+            available,
+          }
+        : { ...(draft as AdminProduct), name, cat, sale, ic, image, images, price: priceRaw ? Number(priceRaw.replace(/[^\d]/g, "")) : null, badge, desc, available };
 
-    onSave(base, isNew);
-    setEditing(null);
+      await Promise.resolve(onSave(base, isNew));
+      setEditing(null);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "آپلود عکس ناموفق بود");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -60,7 +201,7 @@ export function ProductsView({
       <div className="adm-page-head">
         <div>
           <h1>محصولات</h1>
-          <p>کاتالوگ فروشگاه؛ قیمت، نوع فروش (وزنی/عددی)، موجودی و برچسب‌ها را از همین‌جا مدیریت کنید</p>
+          <p>کاتالوگ فروشگاه؛ عکس، قیمت، نوع فروش (وزنی/عددی)، موجودی و برچسب‌ها را از همین‌جا مدیریت کنید</p>
         </div>
         <button type="button" className="btn btn-primary btn-sm" onClick={() => setEditing("new")}>
           + افزودن محصول
@@ -99,8 +240,16 @@ export function ProductsView({
                 rows.map((p) => (
                   <tr key={p.id}>
                     <td>
-                      <div className="adm-cell-main">{p.name}</div>
-                      <div className="adm-cell-sub">{p.id}</div>
+                      <div className="adm-prod-cell">
+                        <AdminThumb p={p} />
+                        <div>
+                          <div className="adm-cell-main">{p.name}</div>
+                          <div className="adm-cell-sub">
+                            {p.id}
+                            {storedProductImages(p).length > 1 ? ` · ${storedProductImages(p).length} عکس` : ""}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td>{catName(p.cat)}</td>
                     <td>{p.sale === "w" ? "وزنی (کیلو)" : "عددی (بسته)"}</td>
@@ -134,23 +283,79 @@ export function ProductsView({
       </div>
 
       {editing ? (
-        <AppModal title={editing === "new" ? "افزودن محصول" : "ویرایش محصول"} icon="box" wide onClose={() => setEditing(null)}>
+        <AppModal title={editing === "new" ? "افزودن محصول" : "ویرایش محصول"} icon="box" wide onClose={() => !saving && setEditing(null)}>
           <form onSubmit={submit}>
             <div className="form-grid cols-2">
+              <div className="adm-photo-field">
+                <label>عکس‌های محصول</label>
+                <div className="adm-photo-grid">
+                  {photos.map((ph, i) => {
+                    const src = ph.kind === "stored" ? productImagesSrc({ id: draft?.id || "x", image: ph.url, images: [ph.url] })[0] : ph.preview;
+                    return (
+                      <div key={ph.key} className={`adm-photo-tile${i === 0 ? " is-cover" : ""}`}>
+                        <img src={src} alt="" />
+                        {i === 0 ? <span className="adm-photo-cover-tag">کاور</span> : null}
+                        <div className="adm-photo-tile-actions">
+                          {i > 0 ? (
+                            <button type="button" className="btn btn-ghost btn-sm" disabled={saving} onClick={() => makeCover(ph.key)}>
+                              کاور
+                            </button>
+                          ) : null}
+                          <button type="button" className="btn btn-ghost btn-sm" disabled={saving || i === 0} onClick={() => movePhoto(ph.key, -1)} title="جابه‌جایی">
+                            ‹
+                          </button>
+                          <button type="button" className="btn btn-ghost btn-sm" disabled={saving || i === photos.length - 1} onClick={() => movePhoto(ph.key, 1)} title="جابه‌جایی">
+                            ›
+                          </button>
+                          <button type="button" className="btn btn-ghost btn-sm" disabled={saving} onClick={() => removePhoto(ph.key)}>
+                            حذف
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {photos.length < PRODUCT_IMAGES_MAX ? (
+                    <label className="adm-photo-add">
+                      <span>+ افزودن عکس</span>
+                      <input
+                        type="file"
+                        accept={PRODUCT_IMAGE_ACCEPT}
+                        multiple
+                        hidden
+                        disabled={saving}
+                        onChange={(e) => {
+                          pickPhotos(e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+                <span className="hint">
+                  حداکثر {PRODUCT_IMAGES_MAX} عکس — JPEG، PNG یا WebP — هر کدام تا ۲ مگابایت. اولین عکس کاور است و در کارت‌ها و سبد نمایش داده می‌شود.
+                </span>
+              </div>
               <div>
                 <label htmlFor="pf-name">نام محصول</label>
                 <input id="pf-name" name="name" required defaultValue={draft?.name} />
               </div>
               <div>
                 <label htmlFor="pf-cat">دسته‌بندی</label>
-                <select id="pf-cat" name="cat" defaultValue={draft?.cat || sellable[0]?.id}>
-                  {sellable.map((c) => (
+                <select id="pf-cat" name="cat" defaultValue={draft?.cat || sellable[0]?.id || categories[0]?.id}>
+                  {categories.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {c.name}{c.soon ? " (به‌زودی)" : ""}
                     </option>
                   ))}
                 </select>
               </div>
+              {editing === "new" ? (
+                <div>
+                  <label htmlFor="pf-id">شناسه انگلیسی (اختیاری)</label>
+                  <input id="pf-id" name="id" dir="ltr" placeholder="مثلا kebab-koobideh" />
+                  <span className="hint">اگر خالی بماند خودکار ساخته می‌شود</span>
+                </div>
+              ) : null}
               <div>
                 <label htmlFor="pf-badge">برچسب (اختیاری)</label>
                 <input id="pf-badge" name="badge" placeholder="مثلا: پرفروش" defaultValue={draft?.badge} />
@@ -184,11 +389,11 @@ export function ProductsView({
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>
+              <button type="button" className="btn btn-ghost" disabled={saving} onClick={() => setEditing(null)}>
                 انصراف
               </button>
-              <button type="submit" className="btn btn-primary">
-                ذخیره محصول
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? "در حال ذخیره…" : "ذخیره محصول"}
               </button>
             </div>
           </form>

@@ -1,26 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "@/lib/toast";
-import { INTRO_MSG, GREET_MSG, PEEK_MSG, type RecipeTip } from "@/lib/assistant-content";
+import type { RecipeTip } from "@/lib/assistant-content";
+import type { Product } from "@/lib/data";
 import { AppModal } from "@/components/AppModal";
 
 export function AssistantView({
   recipes,
   defaultOn,
+  intro: introProp,
+  peek: peekProp,
+  products,
   onToggleDefault,
+  onSaveMessages,
   onSave,
   onDelete,
 }: {
   recipes: RecipeTip[];
   defaultOn: boolean;
+  intro: string;
+  peek: string;
+  products: Product[];
   onToggleDefault: (value: boolean) => void;
+  onSaveMessages: (intro: string, peek: string) => void;
   onSave: (recipe: RecipeTip, index: number | null) => void;
   onDelete: (index: number) => void;
 }) {
-  const [intro, setIntro] = useState(INTRO_MSG);
-  const [greet, setGreet] = useState(GREET_MSG);
-  const [peek, setPeek] = useState(PEEK_MSG);
+  const [intro, setIntro] = useState(introProp);
+  const [peek, setPeek] = useState(peekProp);
   const [editing, setEditing] = useState<{ index: number | null; recipe: RecipeTip } | null>(null);
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -29,7 +36,8 @@ export function AssistantView({
     const title = (form.elements.namedItem("title") as HTMLInputElement).value.trim();
     const keysRaw = (form.elements.namedItem("keys") as HTMLInputElement).value.trim();
     const text = (form.elements.namedItem("text") as HTMLTextAreaElement).value.trim();
-    onSave({ title, keys: keysRaw.split(/[،,]/).map((s) => s.trim()).filter(Boolean), text, products: editing?.recipe.products || [] }, editing?.index ?? null);
+    const selected = new FormData(form).getAll("products").map(String);
+    onSave({ title, keys: keysRaw.split(/[،,]/).map((s) => s.trim()).filter(Boolean), text, products: selected }, editing?.index ?? null);
     setEditing(null);
   }
 
@@ -54,16 +62,12 @@ export function AssistantView({
           style={{ padding: 18 }}
           onSubmit={(e) => {
             e.preventDefault();
-            toast("پیام‌های دستیار ذخیره شد");
+            onSaveMessages(intro, peek);
           }}
         >
           <div>
             <label htmlFor="as-intro">پیام خوش‌آمد اول ورود</label>
             <input id="as-intro" value={intro} onChange={(e) => setIntro(e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="as-greet">پیام دعوت دوباره</label>
-            <input id="as-greet" value={greet} onChange={(e) => setGreet(e.target.value)} />
           </div>
           <div>
             <label htmlFor="as-peek">پیام حضور در گوشه صفحه</label>
@@ -96,7 +100,7 @@ export function AssistantView({
           </div>
         </div>
         {recipes.map((r, i) => (
-          <div className="acc-setting-row" style={{ alignItems: "flex-start" }} key={i}>
+          <div className="acc-setting-row" style={{ alignItems: "flex-start" }} key={`${r.title}-${i}`}>
             <div style={{ maxWidth: "80%" }}>
               <b>{r.title}</b>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "6px 0" }}>
@@ -109,6 +113,11 @@ export function AssistantView({
               <span className="hint" style={{ display: "block", lineHeight: 1.7 }}>
                 {r.text}
               </span>
+              {r.products.length ? (
+                <span className="hint" style={{ display: "block", marginTop: 6 }}>
+                  محصولات پیشنهادی: {r.products.map((id) => products.find((p) => p.id === id)?.name || id).join("، ")}
+                </span>
+              ) : null}
             </div>
             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEditing({ index: i, recipe: r })}>
@@ -137,6 +146,17 @@ export function AssistantView({
               <div>
                 <label htmlFor="rf-text">متن پاسخ دستیار</label>
                 <textarea id="rf-text" name="text" required defaultValue={editing.recipe.text} style={{ minHeight: 100 }} />
+              </div>
+              <div>
+                <label>محصولات پیشنهادی</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxHeight: 180, overflow: "auto", paddingTop: 6 }}>
+                  {products.map((p) => (
+                    <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem" }}>
+                      <input type="checkbox" name="products" value={p.id} defaultChecked={editing.recipe.products.includes(p.id)} style={{ width: "auto" }} />
+                      {p.name}
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 }}>

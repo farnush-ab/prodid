@@ -1,5 +1,6 @@
 import { BRAND } from "@/lib/data";
 import { faNum, fmtPrice, qtyLabelBySale } from "@/lib/format";
+import { couponDiscountAmount, orderPayable, type OrderCoupon } from "@/lib/coupon";
 
 export const DELIVERY_DAYS = [
   { id: "today", label: "امروز (ارسال همان‌روز)" },
@@ -29,7 +30,7 @@ export const PAY_METHODS = [
   {
     id: "online" as const,
     label: "پرداخت آنلاین",
-    hint: "ورود با موبایل لازم است؛ صفحه پرداخت در همین صفحه باز می‌شود.",
+    hint: "با درگاه زرین‌پال؛ ورود با موبایل لازم است.",
     icon: "card",
   },
 ];
@@ -83,7 +84,10 @@ export interface PublicOrder {
   status: OrderStatus;
   estimatedTotal: number;
   finalTotal: number | null;
+  deliveryFee?: number | null;
   hasWeightItems: boolean;
+  coupon?: OrderCoupon | null;
+  zarinpalRefId?: string;
   createdAt: string;
   viewToken?: string;
 }
@@ -97,6 +101,7 @@ export interface CreateOrderInput {
   slot: string;
   pay: string;
   notes?: string;
+  couponCode?: string;
 }
 
 export function dayLabel(id: string) {
@@ -119,6 +124,10 @@ export function isPayMethod(v: string): v is PayMethod {
   return PAY_METHODS.some((p) => p.id === v);
 }
 
+export function canPayOnlineOrder(o: Pick<PublicOrder, "paymentMethod" | "paymentStatus" | "status">) {
+  return o.paymentMethod === "online" && o.paymentStatus !== "paid" && o.status !== "cancelled";
+}
+
 export function orderWhatsappText(order: PublicOrder, kind: "new" | "track" = "new") {
   const title = kind === "track" ? "*پیگیری سفارش پرودید*" : "*سفارش جدید از سایت پرودید*";
   const lines = [
@@ -133,6 +142,10 @@ export function orderWhatsappText(order: PublicOrder, kind: "new" | "track" = "n
     ),
     "──────────────",
     `جمع کل${order.hasWeightItems ? " (تقریبی)" : ""}: ${fmtPrice(order.estimatedTotal)} تومان`,
+    order.coupon
+      ? `تخفیف ${faNum.format(order.coupon.percent)}٪ کد ${order.coupon.code}: −${fmtPrice(couponDiscountAmount(order.estimatedTotal, order.coupon.percent))} تومان`
+      : "",
+    order.coupon ? `قابل پرداخت: ${fmtPrice(orderPayable(order))} تومان` : "",
     `گیرنده: ${order.customer.name}`,
     `موبایل: ${order.customer.phone}`,
     `آدرس: ${order.customer.address}`,
@@ -143,8 +156,9 @@ export function orderWhatsappText(order: PublicOrder, kind: "new" | "track" = "n
   return lines.join("\n");
 }
 
-export function orderWhatsappUrl(order: PublicOrder, kind: "new" | "track" = "new") {
-  return `https://wa.me/${BRAND.phoneIntl}?text=${encodeURIComponent(orderWhatsappText(order, kind))}`;
+export function orderWhatsappUrl(order: PublicOrder, kind: "new" | "track" = "new", phoneIntl?: string) {
+  const intl = phoneIntl || BRAND.phoneIntl;
+  return `https://wa.me/${intl}?text=${encodeURIComponent(orderWhatsappText(order, kind))}`;
 }
 
 export const LAST_ORDER_KEY = "prodid_last_order";

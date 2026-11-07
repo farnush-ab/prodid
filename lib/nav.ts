@@ -1,6 +1,7 @@
 export const NAV_LINKS = [
   { id: "index", href: "/", label: "صفحه اصلی" },
   { id: "shop", href: "/shop", label: "فروشگاه" },
+  { id: "salad-bar", href: "/salad-bar", label: "سالاد بار" },
   { id: "shipping", href: "/shipping", label: "ارسال و سفارش" },
   { id: "about", href: "/about", label: "درباره ما" },
   { id: "contact", href: "/contact", label: "تماس با ما" },

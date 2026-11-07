@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { fmtPrice, faNum } from "@/lib/format";
 import type { AdminCustomer, AdminOrder } from "@/lib/admin-data";
+import { orderPayable } from "@/lib/coupon";
 import { AppModal } from "@/components/AppModal";
 import { EmptyRow, StatusPill } from "./shared";
 
@@ -90,9 +91,15 @@ export function CustomersView({
               <label>آخرین سفارش</label>
               <div className="val">{openCustomer.last}</div>
             </div>
+            <div className="adm-dblock" style={{ gridColumn: "1 / -1" }}>
+              <label>آدرس</label>
+              <div className="val" style={{ fontWeight: 500, fontSize: "0.8rem", lineHeight: 1.9 }}>
+                {openCustomer.address || "—"}
+              </div>
+            </div>
             <div className="adm-dblock">
-              <label>وضعیت حساب</label>
-              <div className="val">{openCustomer.status === "active" ? "فعال" : "مسدود"}</div>
+              <label>تاریخ تولد</label>
+              <div className="val">{openCustomer.birthDate || "ثبت نشده"}</div>
             </div>
           </div>
 
@@ -116,7 +123,7 @@ export function CustomersView({
               <div className="adm-item-line" key={o.orderNo}>
                 <span>{o.orderNo}</span>
                 <StatusPill status={o.status} />
-                <span>{fmtPrice(o.estimatedTotal)} تومان</span>
+                <span>{fmtPrice(orderPayable(o))} تومان</span>
               </div>
             ))
           ) : (

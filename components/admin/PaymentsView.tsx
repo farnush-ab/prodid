@@ -6,23 +6,37 @@ import { fmtPrice, faNum } from "@/lib/format";
 import { PAY_METHOD_LABEL } from "@/lib/order";
 import type { AdminOrder } from "@/lib/admin-data";
 import { isCreatedToday } from "@/lib/admin-data";
-import { toast } from "@/lib/toast";
+import { orderPayable } from "@/lib/coupon";
+import type { PaymentDetails } from "@/lib/store-settings";
 import { EmptyRow } from "./shared";
 
-export function PaymentsView({ orders, onMarkPaid }: { orders: AdminOrder[]; onMarkPaid: (orderNo: string) => void }) {
+export function PaymentsView({
+  orders,
+  onMarkPaid,
+  payments,
+  onlinePay,
+  onSavePayments,
+}: {
+  orders: AdminOrder[];
+  onMarkPaid: (orderNo: string) => void;
+  payments: PaymentDetails;
+  onlinePay: boolean;
+  onSavePayments: (payments: PaymentDetails, onlinePay: boolean) => void;
+}) {
   const pending = orders.filter((o) => o.paymentMethod !== "cod" && o.paymentStatus === "unpaid" && o.status !== "cancelled");
-  const paidToday = orders.filter((o) => isCreatedToday(o) && o.paymentStatus === "paid").reduce((s, o) => s + o.estimatedTotal, 0);
+  const paidToday = orders.filter((o) => isCreatedToday(o) && o.paymentStatus === "paid").reduce((s, o) => s + orderPayable(o), 0);
 
-  const [holder, setHolder] = useState("عاطفه رستمی");
-  const [cardNumber, setCardNumber] = useState("6037-9917-1234-5678");
-  const [bank, setBank] = useState("بانک ملت");
+  const [holder, setHolder] = useState(payments.cardHolder);
+  const [cardNumber, setCardNumber] = useState(payments.cardNumber);
+  const [bank, setBank] = useState(payments.bankName);
+  const [online, setOnline] = useState(onlinePay);
 
   return (
     <div>
       <div className="adm-page-head">
         <div>
           <h1>پرداخت‌ها</h1>
-          <p>چون درگاه آنلاین هنوز وصل نیست، پرداخت کارت‌به‌کارت باید دستی تایید شود</p>
+          <p>پرداخت زرین‌پال بعد از بازگشت از درگاه خودکار تایید می‌شود؛ کارت‌به‌کارت را اینجا دستی تایید کنید</p>
         </div>
       </div>
 
@@ -58,7 +72,7 @@ export function PaymentsView({ orders, onMarkPaid }: { orders: AdminOrder[]; onM
           <span className="m-body">
             <span className="m-label">درگاه آنلاین</span>
             <span className="m-value" style={{ fontSize: "0.95rem" }}>
-              به‌زودی (زرین‌پال)
+              {onlinePay ? "فعال" : "خاموش"}
             </span>
           </span>
         </div>
@@ -90,7 +104,7 @@ export function PaymentsView({ orders, onMarkPaid }: { orders: AdminOrder[]; onM
                     <td className="adm-cell-main">{o.orderNo}</td>
                     <td>{o.customer.name}</td>
                     <td>{PAY_METHOD_LABEL[o.paymentMethod]}</td>
-                    <td className="amount">{fmtPrice(o.estimatedTotal)} تومان</td>
+                    <td className="amount">{fmtPrice(orderPayable(o))} تومان</td>
                     <td className="adm-cell-sub">{o.createdLabel}</td>
                     <td>
                       <button type="button" className="btn btn-outline btn-sm" onClick={() => onMarkPaid(o.orderNo)}>
@@ -117,7 +131,7 @@ export function PaymentsView({ orders, onMarkPaid }: { orders: AdminOrder[]; onM
             style={{ padding: 18 }}
             onSubmit={(e) => {
               e.preventDefault();
-              toast("اطلاعات کارت ذخیره شد");
+              onSavePayments({ cardHolder: holder, cardNumber, bankName: bank }, online);
             }}
           >
             <div>
@@ -146,16 +160,23 @@ export function PaymentsView({ orders, onMarkPaid }: { orders: AdminOrder[]; onM
           <div className="acc-setting-row" style={{ margin: "0 18px" }}>
             <div>
               <b>فعال‌سازی زرین‌پال</b>
-              <span className="hint">پس از دریافت مرچنت‌کد قابل فعال‌سازی است</span>
+              <span className="hint">گزینه پرداخت آنلاین در تسویه‌حساب دیده می‌شود</span>
             </div>
             <label className="acc-switch">
-              <input type="checkbox" disabled />
+              <input
+                type="checkbox"
+                checked={online}
+                onChange={(e) => {
+                  setOnline(e.target.checked);
+                  onSavePayments({ cardHolder: holder, cardNumber, bankName: bank }, e.target.checked);
+                }}
+              />
               <span className="track" />
               <span className="thumb" />
             </label>
           </div>
           <p className="hint" style={{ padding: "0 18px 18px" }}>
-            به محض اتصال درگاه، گزینه «پرداخت آنلاین» در تسویه‌حساب سایت به‌صورت خودکار فعال می‌شود.
+            با روشن کردن این گزینه، «پرداخت آنلاین» در تسویه‌حساب دیده می‌شود. مرچنت‌آیدی و حالت سندباکس را در متغیرهای محیطی سرور تنظیم کنید.
           </p>
         </div>
       </div>

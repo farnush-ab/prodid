@@ -9,13 +9,14 @@
    ========================================================= */
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { BRAND, PRODUCTS, getProduct, type Product } from "@/lib/data";
+import { getCatalogSnapshot, getLiveProduct, type PublicCatalog } from "@/lib/catalog-store";
+import type { Product } from "@/lib/data";
 import { fmtPrice, toFa, unitLabel } from "@/lib/format";
 import { iconHTML } from "@/lib/icons";
 import { Cart } from "@/lib/cart";
 import { toast } from "@/lib/toast";
 import { pageHref } from "@/lib/page";
-import { INTRO_MSG, GREET_MSG, PEEK_MSG, RECIPES } from "@/lib/assistant-content";
+import { productImageSrc } from "@/lib/product-image";
 
 const AVATAR = "/assets/img/assistant.png";
 const WALK_IMG = "/assets/img/assistant-walk.png";
@@ -26,7 +27,10 @@ const AKEY = "prodid_assistant";
 
 interface AState {
   disabled?: boolean;
+  /** شخصیت یک‌بار در صفحه اصلی راه رفته — دیگر تکرار نمی‌شود */
   walked?: boolean;
+  /** شخصیت یک‌بار در صفحه محصول سرک کشیده — دیگر تکرار نمی‌شود */
+  peeked?: boolean;
 }
 
 function norm(s: string) {
@@ -43,19 +47,20 @@ function norm(s: string) {
 }
 const has = (t: string, words: string[]) => words.some((w) => t.includes(norm(w)));
 
-function faqAnswer(t: string): { text: string; contact?: boolean } | null {
+function faqAnswer(t: string, cat: PublicCatalog): { text: string; contact?: boolean } | null {
+  const brand = cat.brand;
   if (has(t, ["وزنی", "وزن کشی", "قیمت نهایی", "قیمت دقیق", "چرا تقریبی"]))
     return {
       text: "قیمت محصولات وزنی برای «هر کیلوگرم» است؛ مبلغ سبد شما تقریبی محاسبه می‌شود و بعد از وزن‌کشی دقیق سفارش، مبلغ نهایی قبل از ارسال بهت اطلاع داده می‌شود. 🔎 روی هر محصول برچسب «وزنی» یا «عددی» را می‌بینی.",
     };
   if (has(t, ["حداقل سفارش", "حداقل مبلغ", "حداقل خرید"]))
-    return { text: `حداقل مبلغ سفارش اینترنتی ${fmtPrice(BRAND.minOrder)} تومان است. برای خرید کمتر، می‌توانی حضوری به فروشگاه سر بزنی.` };
+    return { text: `حداقل مبلغ سفارش اینترنتی ${fmtPrice(brand.minOrder)} تومان است. برای خرید کمتر، می‌توانی حضوری به فروشگاه سر بزنی.` };
   if (has(t, ["هزینه ارسال", "پیک", "کرایه"]))
     return { text: "هزینه ارسال جداگانه و بر اساس فاصله آدرس شما از فروشگاه محاسبه می‌شود و هنگام تایید سفارش اعلام می‌گردد." };
   if (has(t, ["کی میرسه", "چقدر طول", "زمان ارسال", "زمان تحویل", "بازه", "امروز میرسه", "همان روز", "همون روز"]))
     return { text: "سفارش‌های ساعات کاری، همان روز ارسال می‌شوند و موقع ثبت سفارش می‌توانی بازه تحویل را انتخاب کنی: ۹ تا ۱۲، ۱۲ تا ۱۵، ۱۵ تا ۱۸ یا ۱۸ تا ۲۱." };
   if (has(t, ["کجا ارسال", "محدوده", "شهرستان", "تهران", "خارج از کاشان", "کدوم شهر"]))
-    return { text: "فعلا فقط در محدوده شهر کاشان ارسال داریم. اگر از پوشش آدرست مطمئن نیستی، قبل از سفارش یک تماس بگیر.", contact: true };
+    return { text: `فعلا فقط در محدوده شهر ${brand.city} ارسال داریم. اگر از پوشش آدرست مطمئن نیستی، قبل از سفارش یک تماس بگیر.`, contact: true };
   if (has(t, ["پرداخت", "درگاه", "کارت به کارت", "نقدی", "پوز", "کارتخوان"]))
     return { text: "فعلا دو روش داریم: کارت به کارت (بعد از تایید سفارش) یا پرداخت در محل تحویل با کارت‌خوان سیار. درگاه آنلاین هم به‌زودی فعال می‌شود." };
   if (has(t, ["نگهداری", "فریزر", "یخچال", "منجمد", "چند روز میمونه", "ماندگاری"]))
@@ -65,15 +70,15 @@ function faqAnswer(t: string): { text: string; contact?: boolean } | null {
   if (has(t, ["موجود", "دارید", "داری", "هست", "موجودی"]))
     return { text: "همه محصولاتی که در فروشگاه می‌بینی موجود هستند؛ اگر محصولی ناموجود شود، روی کارتش مشخص می‌شود. اسم محصول موردنظرت را بنویس تا قیمتش را بگویم!" };
   if (has(t, ["ادرس", "کجایید", "کجاست", "فروشگاه حضوری", "ساعت کاری", "تماس", "شماره", "تلفن", "واتساپ", "اینستاگرام"]))
-    return { text: `فروشگاه ما: ${BRAND.address}. تلفن سفارش: ${toFa(BRAND.phone)}. همه‌روزه باز هستیم.`, contact: true };
+    return { text: `فروشگاه ما: ${brand.address}. تلفن سفارش: ${toFa(brand.phone)}. همه‌روزه باز هستیم.`, contact: true };
   if (has(t, ["تفاوت", "فرق"]))
     return { text: "بگو بین کدام دو محصول مردد هستی تا مقایسه‌شان کنم؛ مثلا «فرق ریبای و تی‌بون» یا «فرق ژامبون مرغ و بوقلمون». به‌طور کلی: ریبای چرب‌تر و لطیف‌تر است، تی‌بون دو بافت دارد؛ ژامبون بوقلمون کم‌چرب‌تر از مرغ است." };
   return null;
 }
 
-function findProducts(t: string): Product[] {
+function findProducts(t: string, products: Product[]): Product[] {
   const hits: { p: Product; score: number }[] = [];
-  for (const p of PRODUCTS) {
+  for (const p of products) {
     const words = norm(p.name).split(" ").filter((w) => w.length > 2);
     const score = words.filter((w) => t.includes(w)).length;
     if (score >= Math.min(2, words.length)) hits.push({ p, score });
@@ -94,17 +99,18 @@ interface Answer {
 
 function answer(q: string): Answer {
   const t = norm(q);
+  const cat = getCatalogSnapshot();
 
   if (has(t, ["سلام", "درود", "خوبی", "هی ", "hello", "hi"]) && t.length < 25)
     return { text: "سلام! 🙌 من دستیار هوشمند پرودید هستم. درباره محصولات، قیمت، ارسال یا حتی ایده و طرز تهیه غذا ازم بپرس." };
 
   if (has(t, ["مرسی", "ممنون", "تشکر", "دمت گرم"])) return { text: "خواهش می‌کنم! نوش جان 😊 اگر باز سوالی بود در خدمتم." };
 
-  for (const r of RECIPES) {
+  for (const r of cat.assistant.recipes) {
     if (has(t, r.keys)) return { text: r.text, title: r.title, products: r.products };
   }
 
-  const faq = faqAnswer(t);
+  const faq = faqAnswer(t, cat);
   if (faq) return faq;
 
   if (has(t, ["پیشنهاد", "چی بخرم", "چی خوبه", "پرفروش", "چی بگیرم", "شام چی", "ناهار چی"]))
@@ -113,7 +119,7 @@ function answer(q: string): Answer {
       products: ["kabab-koobideh", "hamburger-gousht", "chenje-gosfandi"],
     };
 
-  const found = findProducts(t);
+  const found = findProducts(t, cat.products);
   if (found.length) return { text: "این محصول(ها) را پیدا کردم:", productObjs: found };
 
   return {
@@ -157,6 +163,11 @@ export function Assistant() {
     };
     const saveState = () => localStorage.setItem(AKEY, JSON.stringify(stateRef.current));
     stateRef.current = readState();
+    const live = getCatalogSnapshot();
+    if (!live.features.assistantWidget) return;
+    if (!live.assistant.defaultOn && !("disabled" in stateRef.current)) {
+      return;
+    }
 
     function addFooterToggle() {
       const bottom = document.querySelector(".footer-bottom");
@@ -265,7 +276,7 @@ export function Assistant() {
     function productCardMini(p: Product) {
       return `
         <div class="as-product">
-          <div class="as-p-img">${iconHTML(p.ic)}<img src="/assets/img/products/${p.id}.jpg" alt="" onerror="this.remove()"></div>
+          <div class="as-p-img">${iconHTML(p.ic)}<img src="${productImageSrc(p)}" alt="" onerror="this.remove()"></div>
           <div class="as-p-info">
             <b>${p.name}</b>
             <span>${p.price === null ? "استعلام قیمت" : fmtPrice(p.price) + " " + unitLabel(p)}</span>
@@ -288,13 +299,13 @@ export function Assistant() {
       if (a.title) html += `<b class="as-r-title">${a.title}</b>`;
       html += `<span>${a.text}</span>`;
 
-      const prods = a.productObjs || (a.products || []).map(getProduct).filter((p): p is Product => !!p);
+      const prods = a.productObjs || (a.products || []).map(getLiveProduct).filter((p): p is Product => !!p);
       if (prods.length) html += `<div class="as-products">${prods.map(productCardMini).join("")}</div>`;
       if (a.contact) {
         html += `
           <div class="as-contact">
-            <a class="btn btn-sm btn-primary" href="tel:${BRAND.phone}">${iconHTML("phone")} تماس</a>
-            <a class="btn btn-sm btn-outline" href="https://wa.me/${BRAND.phoneIntl}" target="_blank" rel="noopener">${iconHTML("chat")} واتس‌اپ</a>
+            <a class="btn btn-sm btn-primary" href="tel:${getCatalogSnapshot().brand.phone}">${iconHTML("phone")} تماس</a>
+            <a class="btn btn-sm btn-outline" href="https://wa.me/${getCatalogSnapshot().brand.phoneIntl}" target="_blank" rel="noopener">${iconHTML("chat")} واتس‌اپ</a>
           </div>`;
       }
       el.innerHTML = html;
@@ -337,7 +348,7 @@ export function Assistant() {
       const addBtn = (e.target as HTMLElement).closest("[data-add]") as HTMLElement | null;
       if (!addBtn) return;
       e.preventDefault();
-      const p = getProduct(addBtn.dataset.add);
+      const p = getLiveProduct(addBtn.dataset.add);
       if (!p) return;
       Cart.add(p.id);
       toast(`«${p.name}» به سبد اضافه شد`);
@@ -385,12 +396,17 @@ export function Assistant() {
     }
 
     function startWalkIntro() {
+      /* همین ابتدای راه‌رفتن علامت می‌خورد، نه آخرش: اگر کاربر وسط
+         انیمیشن صفحه را عوض کند یا ببندد، دفعه بعد دیگر تکرار نمی‌شود. */
+      stateRef.current.walked = true;
+      saveState();
+
       const el = spawnMoment(
         "",
         `
         <div class="as-walk-bubble" hidden>
           <b>دستیار هوشمند پرودید</b>
-          <span>${INTRO_MSG}</span>
+          <span>${getCatalogSnapshot().assistant.intro}</span>
         </div>
         ${
           cycleReady.current
@@ -421,30 +437,8 @@ export function Assistant() {
         if (moving) moving.outerHTML = `<img class="as-walk-img as-waving" src="${WAVE_IMG}" alt="">`;
         bubble.hidden = false;
         requestAnimationFrame(() => bubble.classList.add("in"));
-        stateRef.current.walked = true;
-        saveState();
         wt(() => endMoment(false), 5200);
       };
-    }
-
-    function popGreet() {
-      const el = spawnMoment(
-        "as-pop",
-        `
-        <div class="as-walk-bubble" hidden>
-          <b>دستیار هوشمند پرودید</b>
-          <span>${GREET_MSG}</span>
-        </div>
-        <img class="as-walk-img as-waving" src="${WAVE_IMG}" alt="دستیار هوشمند پرودید">`
-      );
-      requestAnimationFrame(() => el.classList.add("in"));
-      const bubble = el.querySelector(".as-walk-bubble") as HTMLDivElement;
-      wt(() => {
-        if (!walkerRef.current) return;
-        bubble.hidden = false;
-        requestAnimationFrame(() => bubble.classList.add("in"));
-      }, 700);
-      wt(() => endMoment(false), 5200);
     }
 
     function peekProduct() {
@@ -452,7 +446,7 @@ export function Assistant() {
         "as-peek",
         `
         <div class="as-walk-bubble as-peek-bubble" hidden>
-          <span>${PEEK_MSG}</span>
+          <span>${getCatalogSnapshot().assistant.peek}</span>
         </div>
         <img class="as-peek-img" src="${WAVE_IMG}" alt="دستیار هوشمند پرودید">`
       );
@@ -466,7 +460,7 @@ export function Assistant() {
       wt(() => endMoment(false), 4800);
     }
 
-    (refs.current as any).trigger = { startWalkIntro, popGreet, peekProduct, REDUCED };
+    (refs.current as any).trigger = { startWalkIntro, peekProduct, REDUCED, saveState };
 
     return () => {
       walkTimers.current.forEach(clearTimeout);
@@ -477,7 +471,9 @@ export function Assistant() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* هر بار مسیر عوض شود، معادل «بار جدید صفحه» رفتار حضور شخصیت را دوباره اجرا می‌کنیم */
+  /* حضور شخصیت فقط «یک بار برای همیشه» است و در بازدیدهای بعدی تکرار
+     نمی‌شود: یک بار راه‌رفتن در صفحه اصلی، و یک بار سرک‌کشیدن در اولین
+     صفحه محصول. بعد از آن فقط دکمه شناور دستیار در دسترس می‌ماند. */
   useEffect(() => {
     const t = (refs.current as any)?.trigger;
     if (!t || t.REDUCED) return;
@@ -486,6 +482,7 @@ export function Assistant() {
     const page = !pathname || pathname === "/" ? "index" : pathname.split("/")[1] || "index";
 
     if (page === "index") {
+      if (stateRef.current.walked) return;
       const hero = document.querySelector(".hero");
       if (hero && "IntersectionObserver" in window) {
         let started = false;
@@ -495,8 +492,7 @@ export function Assistant() {
               if (!e.isIntersecting && !started) {
                 started = true;
                 io.disconnect();
-                if (stateRef.current.walked) t.popGreet();
-                else t.startWalkIntro();
+                t.startWalkIntro();
               }
             });
           },
@@ -506,9 +502,14 @@ export function Assistant() {
         return () => io.disconnect();
       }
     } else if (page === "product") {
+      if (stateRef.current.peeked) return;
       const timer = setTimeout(() => {
         const panel = refs.current?.panel;
-        if (panel && !panel.classList.contains("in")) t.peekProduct();
+        if (panel && !panel.classList.contains("in")) {
+          stateRef.current.peeked = true;
+          t.saveState?.();
+          t.peekProduct();
+        }
       }, 5000);
       return () => clearTimeout(timer);
     }

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { fmtPrice, faNum, qtyLabelBySale } from "@/lib/format";
 import { ORDER_STATUS_LABEL, PAY_METHOD_LABEL, dayLabel, slotLabel, orderWhatsappUrl, type OrderStatus } from "@/lib/order";
+import { couponDiscountAmount, orderPayable, orderSubtotal } from "@/lib/coupon";
 import type { AdminOrder } from "@/lib/admin-data";
 import { AppModal } from "@/components/AppModal";
 import { EmptyRow, PayStatusPill, StatusPill } from "./shared";
@@ -45,6 +46,7 @@ export function OrdersView({
   onAdvance,
   onCancel,
   onMarkPaid,
+  onSaveTotals,
 }: {
   orders: AdminOrder[];
   statusFilter: OrderStatus | "all";
@@ -52,6 +54,7 @@ export function OrdersView({
   onAdvance: (orderNo: string) => void;
   onCancel: (orderNo: string) => void;
   onMarkPaid: (orderNo: string) => void;
+  onSaveTotals?: (orderNo: string, finalTotal: number | null, deliveryFee: number | null) => void;
 }) {
   const [search, setSearch] = useState("");
   const [openOrderNo, setOpenOrderNo] = useState<string | null>(null);
@@ -134,7 +137,7 @@ export function OrdersView({
                       <div className="adm-cell-sub">{o.customer.phone}</div>
                     </td>
                     <td>{faNum.format(o.items.length)} قلم</td>
-                    <td className="amount">{fmtPrice(o.estimatedTotal)} تومان</td>
+                    <td className="amount">{fmtPrice(orderPayable(o))} تومان</td>
                     <td>
                       <PayStatusPill status={o.paymentStatus} />
                       <div className="adm-cell-sub">{PAY_METHOD_LABEL[o.paymentMethod]}</div>
@@ -205,9 +208,33 @@ export function OrdersView({
               </div>
             ))}
             <div className="adm-item-line" style={{ borderTop: "1px solid var(--line)", marginTop: 4, paddingTop: 10 }}>
-              <b>مبلغ کل{openOrder.hasWeightItems ? " (تقریبی)" : ""}</b>
+              <b>مبلغ برآوردی{openOrder.hasWeightItems ? " (تقریبی)" : ""}</b>
               <b className="amount">{fmtPrice(openOrder.estimatedTotal)} تومان</b>
             </div>
+            {openOrder.finalTotal != null ? (
+              <div className="adm-item-line">
+                <b>مبلغ نهایی</b>
+                <b className="amount">{fmtPrice(openOrder.finalTotal)} تومان</b>
+              </div>
+            ) : null}
+            {openOrder.coupon ? (
+              <div className="adm-item-line">
+                <span>
+                  تخفیف {openOrder.coupon.percent}٪ ({openOrder.coupon.code})
+                </span>
+                <span className="amount">−{fmtPrice(couponDiscountAmount(orderSubtotal(openOrder), openOrder.coupon.percent))} تومان</span>
+              </div>
+            ) : null}
+            <div className="adm-item-line">
+              <b>قابل پرداخت</b>
+              <b className="amount">{fmtPrice(orderPayable(openOrder))} تومان</b>
+            </div>
+            {openOrder.deliveryFee != null ? (
+              <div className="adm-item-line">
+                <span>هزینه ارسال</span>
+                <span className="amount">{fmtPrice(openOrder.deliveryFee)} تومان</span>
+              </div>
+            ) : null}
             {openOrder.hasWeightItems ? (
               <p className="hint" style={{ marginTop: 8 }}>
                 این سفارش قلم وزنی دارد؛ مبلغ نهایی پس از وزن‌کشی مشخص می‌شود.
@@ -253,6 +280,34 @@ export function OrdersView({
                 {openOrder.notes}
               </div>
             </div>
+          ) : null}
+
+          {openOrder.status !== "cancelled" && onSaveTotals ? (
+            <form
+              className="form-grid cols-2"
+              style={{ marginBottom: 16 }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const finalRaw = (form.elements.namedItem("finalTotal") as HTMLInputElement).value.trim();
+                const feeRaw = (form.elements.namedItem("deliveryFee") as HTMLInputElement).value.trim();
+                onSaveTotals(openOrder.orderNo, finalRaw ? Number(finalRaw.replace(/[^\d]/g, "")) : null, feeRaw ? Number(feeRaw.replace(/[^\d]/g, "")) : null);
+              }}
+            >
+              <div>
+                <label htmlFor="of-final">مبلغ نهایی پس از وزن‌کشی (تومان)</label>
+                <input id="of-final" name="finalTotal" dir="ltr" defaultValue={openOrder.finalTotal ?? ""} placeholder={String(openOrder.estimatedTotal)} />
+              </div>
+              <div>
+                <label htmlFor="of-fee">هزینه ارسال (تومان)</label>
+                <input id="of-fee" name="deliveryFee" dir="ltr" defaultValue={openOrder.deliveryFee ?? ""} />
+              </div>
+              <div>
+                <button type="submit" className="btn btn-outline btn-sm">
+                  ذخیره مبالغ
+                </button>
+              </div>
+            </form>
           ) : null}
 
           <div className="adm-actions">

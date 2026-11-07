@@ -1,23 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { BRAND } from "@/lib/data";
-import { toast } from "@/lib/toast";
+import type { BrandInfo, StoreFeatures } from "@/lib/store-settings";
 
 export function SettingsView({
-  maintenanceOn,
-  onToggleMaintenance,
+  brand,
+  features,
+  onSaveBrand,
+  onSaveFeatures,
 }: {
-  maintenanceOn: boolean;
-  onToggleMaintenance: (value: boolean) => void;
+  brand: BrandInfo;
+  features: StoreFeatures;
+  onSaveBrand: (brand: Partial<BrandInfo>) => void;
+  onSaveFeatures: (features: StoreFeatures) => void;
 }) {
-  const [vpnNotice, setVpnNotice] = useState(true);
-  const [assistantWidget, setAssistantWidget] = useState(true);
-  const [name, setName] = useState(BRAND.name);
-  const [slogan, setSlogan] = useState(BRAND.slogan);
-  const [phone, setPhone] = useState(BRAND.phone);
-  const [instagram, setInstagram] = useState(BRAND.instagram);
-  const [address, setAddress] = useState(BRAND.address);
+  const [name, setName] = useState(brand.name);
+  const [slogan, setSlogan] = useState(brand.slogan);
+  const [city, setCity] = useState(brand.city);
+  const [phone, setPhone] = useState(brand.phone);
+  const [instagram, setInstagram] = useState(brand.instagram);
+  const [address, setAddress] = useState(brand.address);
 
   return (
     <div>
@@ -37,7 +39,7 @@ export function SettingsView({
           style={{ padding: 18 }}
           onSubmit={(e) => {
             e.preventDefault();
-            toast("اطلاعات فروشگاه ذخیره شد");
+            onSaveBrand({ name, slogan, city, phone, instagram, address });
           }}
         >
           <div>
@@ -47,6 +49,10 @@ export function SettingsView({
           <div>
             <label htmlFor="brand-slogan">شعار</label>
             <input id="brand-slogan" value={slogan} onChange={(e) => setSlogan(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="brand-city">شهر ارسال</label>
+            <input id="brand-city" value={city} onChange={(e) => setCity(e.target.value)} />
           </div>
           <div>
             <label htmlFor="brand-phone">شماره تماس</label>
@@ -78,7 +84,7 @@ export function SettingsView({
             <span className="hint">غیرفعال‌کردن موقت خرید برای مشتریان، بدون حذف اطلاعات</span>
           </div>
           <label className="acc-switch">
-            <input type="checkbox" checked={maintenanceOn} onChange={(e) => onToggleMaintenance(e.target.checked)} />
+            <input type="checkbox" checked={features.maintenance} onChange={(e) => onSaveFeatures({ ...features, maintenance: e.target.checked })} />
             <span className="track" />
             <span className="thumb" />
           </label>
@@ -89,7 +95,7 @@ export function SettingsView({
             <span className="hint">در صورت فیلترینگ به کاربران نمایش داده می‌شود</span>
           </div>
           <label className="acc-switch">
-            <input type="checkbox" checked={vpnNotice} onChange={(e) => setVpnNotice(e.target.checked)} />
+            <input type="checkbox" checked={features.vpnNotice} onChange={(e) => onSaveFeatures({ ...features, vpnNotice: e.target.checked })} />
             <span className="track" />
             <span className="thumb" />
           </label>
@@ -100,7 +106,7 @@ export function SettingsView({
             <span className="hint">خاموش‌کردن کلی ویجت دستیار در تمام سایت</span>
           </div>
           <label className="acc-switch">
-            <input type="checkbox" checked={assistantWidget} onChange={(e) => setAssistantWidget(e.target.checked)} />
+            <input type="checkbox" checked={features.assistantWidget} onChange={(e) => onSaveFeatures({ ...features, assistantWidget: e.target.checked })} />
             <span className="track" />
             <span className="thumb" />
           </label>
@@ -108,10 +114,10 @@ export function SettingsView({
         <div className="acc-setting-row" style={{ margin: "0 18px" }}>
           <div>
             <b>پرداخت آنلاین (زرین‌پال)</b>
-            <span className="hint">پس از تنظیم درگاه در بخش پرداخت‌ها فعال می‌شود</span>
+            <span className="hint">گزینه پرداخت آنلاین در تسویه‌حساب دیده می‌شود؛ مرچنت‌آیدی زرین‌پال از env خوانده می‌شود</span>
           </div>
           <label className="acc-switch">
-            <input type="checkbox" disabled />
+            <input type="checkbox" checked={features.onlinePay} onChange={(e) => onSaveFeatures({ ...features, onlinePay: e.target.checked })} />
             <span className="track" />
             <span className="thumb" />
           </label>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/lib/icons";
 import type { Category } from "@/lib/data";
+import { categoryImageSrc } from "@/lib/category-image";
 import { pageHref } from "@/lib/page";
 import { toast } from "@/lib/toast";
 import { useReveal, staggerDelay } from "@/components/Reveal";
@@ -29,12 +30,7 @@ export function CategoryCard({ c, index }: { c: Category; index?: number }) {
         <span className="c-img">
           <Icon name={c.ic} />
           {imgOk && (
-            <img
-              src={`/assets/img/categories/${c.id}.jpg`}
-              alt={c.name}
-              loading="lazy"
-              onError={() => setImgOk(false)}
-            />
+            <img src={categoryImageSrc(c)} alt={c.name} loading="lazy" onError={() => setImgOk(false)} />
           )}
         </span>
         <span className="c-name">{c.name}</span>
@@ -46,14 +42,7 @@ export function CategoryCard({ c, index }: { c: Category; index?: number }) {
     <Link ref={ref} className={`cat-card tilt ${revealClass}`} style={style} href={`${pageHref("shop")}?cat=${c.id}`}>
       <span className="c-img">
         <Icon name={c.ic} />
-        {imgOk && (
-          <img
-            src={`/assets/img/categories/${c.id}.jpg`}
-            alt={c.name}
-            loading="lazy"
-            onError={() => setImgOk(false)}
-          />
-        )}
+        {imgOk && <img src={categoryImageSrc(c)} alt={c.name} loading="lazy" onError={() => setImgOk(false)} />}
       </span>
       <span className="c-name">{c.name}</span>
     </Link>

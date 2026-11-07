@@ -1,0 +1,33 @@
+services:
+  prodid:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    image: prodid:latest
+    container_name: prodid
+
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/${MONGO_DATABASE}?authSource=${MONGO_DATABASE}
+
+    ports:
+      - "127.0.0.1:3200:3000"
+
+    volumes:
+      - product-uploads:/app/uploads
+
+    networks:
+      - prodid-net
+
+networks:
+  prodid-net:
+    external: true
+
+volumes:
+  product-uploads:
