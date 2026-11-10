@@ -361,20 +361,34 @@ export default function SaladBarPage() {
         </div>
       </section>
 
-      {/* نوار چسبان کاسه — فقط موبایل */}
+      {/* نوار چسبان کاسه — فقط موبایل. کارت بزرگ کاسه در ستون کناری است و
+          روی گوشی زیر کل فهرست مواد می‌افتد، پس حین انتخاب تنها جایی که
+          کاربر سالادش را می‌بیند همین است؛ به‌عمد بزرگ است. */}
       <div className="sb-rail">
         <div className="container sb-rail-in">
-          <Svg className="sb-rail-bowl" html={miniSvg} />
+          <button
+            type="button"
+            className="sb-rail-bowl"
+            onClick={() => document.getElementById("sb-bowl-card")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            aria-label="دیدن کاسهٔ کامل و ثبت سفارش"
+          >
+            <Svg html={miniSvg} />
+          </button>
           <div className="sb-rail-info">
             <b>{itemCount ? money(calc.price) : money(calc.base)}</b>
             <span>
               {itemCount
                 ? `${faNum.format(Math.round(calc.weight))} گرم · ${faNum.format(calc.kcal)} کالری`
-                : `کاسهٔ ${sizeById[size].name} — خالی`}
+                : `کاسهٔ ${sizeById[size].name} — هنوز خالی است`}
             </span>
             <i className={`sb-fillbar${fill > 1 ? " over" : ""}`}>
               <b style={{ width: `${Math.min(100, fill * 100)}%` }} />
             </i>
+            {itemCount ? (
+              <span className="sb-rail-hint">
+                <Icon name="chevron" className="ico" /> روی کاسه بزن تا کاملش را ببینی
+              </span>
+            ) : null}
           </div>
         </div>
       </div>
@@ -755,7 +769,7 @@ export default function SaladBarPage() {
 
         {/* ستون کاسه */}
         <aside className="sb-aside">
-          <div className="sb-card">
+          <div className="sb-card" id="sb-bowl-card">
             <div className="sb-card-top">
               <h3>{itemCount ? `کاسهٔ ${sizeById[size].name}` : "کاسهٔ تو"}</h3>
               <p>

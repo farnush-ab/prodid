@@ -4,6 +4,7 @@ import { Icon } from "@/lib/icons";
 import { pageHref } from "@/lib/page";
 import { ProductCard } from "@/components/ProductCard";
 import { CategoryCard } from "@/components/CategoryCard";
+import { SaladTeaser } from "@/components/SaladTeaser";
 import { useReveal } from "@/components/Reveal";
 import { useCatalog } from "@/lib/catalog-store";
 import Link from "next/link";
@@ -86,6 +87,9 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* دعوت به سالاد بار */}
+      <SaladTeaser />
 
       {/* پرفروش‌ها */}
       <section className="section container">

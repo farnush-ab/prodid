@@ -2338,17 +2338,43 @@ button.adm-metric:hover::after { opacity: 0.75; transform: rotate(45deg) transla
 @media (min-width: 900px) { .sb-hero h1 { font-size: 2rem; } }
 
 /* ---------- نوار چسبان کاسه (موبایل) ---------- */
+/* هدر سایت هم sticky با top:0 و z-index:50 است، پس تا پیش از این دقیقا
+   روی این نوار می‌نشست و کاسه روی گوشی هیچ‌وقت دیده نمی‌شد. در این صفحه
+   هدر را رها می‌کنیم تا با اسکرول برود و جایش را به کاسه بدهد؛ ناوبری
+   روی گوشی از نوار پایین در دسترس است. */
+body.sb-page .site-header { position: static; }
 .sb-rail {
   position: sticky; top: 0; z-index: 40;
   background: rgba(247, 243, 234, 0.96); backdrop-filter: blur(9px);
   border-bottom: 1px solid var(--line);
 }
-.sb-rail-in { display: flex; align-items: center; gap: 12px; padding-block: 9px; }
-.sb-rail-bowl { width: 60px; height: 60px; flex: none; display: block; }
+/* کاسه روی موبایل باید همان‌قدر دیده شود که روی دسکتاپ دیده می‌شود:
+   کارت بزرگ کاسه در ستون کناری است و روی گوشی زیر کل فهرست مواد می‌افتد،
+   پس این نوار چسبان تنها جایی است که کاربر حین انتخاب، سالادش را می‌بیند.
+   به همین دلیل کاسه این‌جا ۱۲۸ پیکسل است، نه یک بندانگشتی. */
+.sb-rail-in { display: flex; align-items: center; gap: 14px; padding-block: 10px; }
+.sb-rail-bowl {
+  width: 128px; height: 128px; flex: none; display: block;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  filter: drop-shadow(0 10px 16px rgba(38, 32, 25, 0.16));
+  transition: transform 0.25s var(--ease);
+}
+.sb-rail-bowl:active { transform: scale(0.96); }
+.sb-rail-bowl > span { display: block; width: 100%; height: 100%; }
 .sb-rail-bowl svg { width: 100%; height: 100%; display: block; }
-.sb-rail-info { flex: 1; min-width: 0; }
-.sb-rail-info b { display: block; font-size: 1rem; font-weight: 900; color: var(--brand-orange-deep); line-height: 1.5; }
-.sb-rail-info span { display: block; font-size: 0.74rem; color: var(--ink-2); }
+.sb-rail-info { flex: 1; min-width: 0; text-align: right; }
+.sb-rail-info b { display: block; font-size: 1.12rem; font-weight: 900; color: var(--brand-orange-deep); line-height: 1.5; }
+.sb-rail-info span { display: block; font-size: 0.78rem; color: var(--ink-2); }
+.sb-rail-hint {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 6px; font-size: 0.72rem; font-weight: 700;
+  color: var(--brand-orange-deep);
+}
+.sb-rail-hint .ico { width: 13px; height: 13px; transform: rotate(-90deg); }
+@media (max-width: 400px) {
+  .sb-rail-bowl { width: 104px; height: 104px; }
+  .sb-rail-info b { font-size: 1rem; }
+}
 .sb-fillbar { display: block; height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 5px; }
 .sb-fillbar b { display: block; height: 100%; border-radius: 999px; background: var(--brand-green); transition: width 0.4s var(--ease); }
 .sb-fillbar.over b { background: #d99a2b; }
@@ -2748,4 +2774,105 @@ body.sb-page .toast { bottom: calc(var(--bottomnav-h) + 78px); }
 @media (min-width: 1000px) {
   body.sb-page #prodid-assistant { bottom: 20px; }
   body.sb-page .toast { bottom: calc(var(--bottomnav-h) + 18px); }
+}
+
+/* =========================================================
+   بخش دعوت به سالاد بار در صفحه اصلی (.sbt-)
+   ========================================================= */
+
+.sbt {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 18px;
+  align-items: center;
+  margin-block: 10px;
+  padding: 26px 22px;
+  border-radius: calc(var(--radius) + 6px);
+  background:
+    radial-gradient(130% 120% at 85% 15%, rgba(126, 163, 86, 0.38) 0%, rgba(126, 163, 86, 0) 58%),
+    radial-gradient(110% 130% at 10% 95%, rgba(217, 102, 10, 0.32) 0%, rgba(217, 102, 10, 0) 60%),
+    linear-gradient(150deg, var(--espresso-800) 0%, #241d16 100%);
+  color: var(--on-dark);
+  box-shadow: 0 18px 44px rgba(38, 32, 25, 0.22);
+}
+/* لکه‌های محو پس‌زمینه تا کادر تخت به نظر نرسد */
+.sbt::after {
+  content: "";
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(circle at 18% 28%, rgba(255, 255, 255, 0.07) 0 2px, transparent 2px),
+    radial-gradient(circle at 72% 72%, rgba(255, 255, 255, 0.05) 0 3px, transparent 3px);
+  pointer-events: none;
+}
+.sbt > * { position: relative; z-index: 1; min-width: 0; }
+
+.sbt-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.76rem; font-weight: 800; letter-spacing: 0.02em;
+  color: var(--brand-orange-light);
+}
+.sbt-eyebrow .ico { width: 15px; height: 15px; }
+.sbt h2 {
+  margin-top: 8px;
+  font-size: 1.62rem; font-weight: 900; line-height: 1.45;
+  color: #fdf7ea;
+}
+.sbt h2 em { font-style: normal; color: var(--brand-orange-light); }
+.sbt-copy > p {
+  margin-top: 8px;
+  font-size: 0.9rem; line-height: 2;
+  color: rgba(247, 241, 228, 0.82);
+  max-width: 52ch;
+}
+.sbt-marks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.sbt-marks span {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid rgba(247, 241, 228, 0.22);
+  border-radius: 999px; padding: 5px 12px;
+  font-size: 0.75rem; color: rgba(247, 241, 228, 0.92);
+}
+.sbt-marks .ico { width: 14px; height: 14px; color: var(--brand-orange-light); }
+
+.sbt-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 18px; }
+.sbt-cta .btn { font-size: 0.92rem; }
+.sbt-from {
+  font-size: 0.82rem; font-weight: 800; color: rgba(247, 241, 228, 0.92);
+}
+.sbt-from i { display: block; font-style: normal; font-weight: 500; font-size: 0.72rem; color: rgba(247, 241, 228, 0.6); }
+
+.sbt-art { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.sbt-bowl {
+  display: block;
+  width: min(230px, 62vw);
+  filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.3));
+  animation: sbtBob 4.2s var(--ease) infinite;
+}
+.sbt-bowl > span { display: block; }
+.sbt-bowl svg { width: 100%; height: auto; display: block; animation: sbtSwap 0.6s var(--ease); }
+.sbt-tag {
+  text-align: center; font-size: 0.76rem; line-height: 1.7;
+  color: rgba(247, 241, 228, 0.7);
+  animation: sbtSwap 0.6s var(--ease);
+}
+.sbt-tag b { display: block; font-size: 0.86rem; font-weight: 800; color: #fdf7ea; }
+
+@keyframes sbtBob {
+  0%, 100% { transform: translateY(0) rotate(-1.2deg); }
+  50% { transform: translateY(-9px) rotate(1.2deg); }
+}
+@keyframes sbtSwap {
+  from { opacity: 0; transform: scale(0.93); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (min-width: 820px) {
+  .sbt { grid-template-columns: 1fr auto; gap: 34px; padding: 34px 32px; }
+  .sbt h2 { font-size: 2rem; }
+  .sbt-bowl { width: 250px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sbt-bowl { animation: none; }
+  .sbt-bowl svg, .sbt-tag { animation: none; }
 }
