@@ -1,4 +1,6 @@
 import { listAllOrders } from "@/lib/order-server";
+import { listSaladOrders } from "@/lib/salad-order-server";
+import { getSaladCatalogAll } from "@/lib/salad-catalog-server";
 import { getLiveCatalog, getStoreSettings } from "@/lib/catalog-server";
 import { lastSeenLabel, relativeFaDate, toAdminOrder } from "@/lib/admin-format";
 import { isStaffRole, type StaffRole } from "@/lib/roles";
@@ -10,6 +12,8 @@ import type { Product } from "@/lib/data";
 import type { StoreSettings } from "@/lib/store-settings";
 import type { AdminSection } from "@/lib/roles";
 import type { CouponRecord } from "@/lib/coupon";
+import type { PublicSaladOrder } from "@/lib/salad-order";
+import type { SaladCatalog } from "@/lib/salad";
 import { orderPayable } from "@/lib/coupon";
 import { listAllCoupons } from "@/lib/coupon-server";
 
@@ -38,6 +42,8 @@ export interface AdminState {
   revenueSeries: number[];
   notifications: AdminNotification[];
   coupons: CouponRecord[];
+  saladOrders: PublicSaladOrder[];
+  saladCatalog: SaladCatalog;
 }
 
 function startOfDay(d: Date) {
@@ -58,13 +64,15 @@ function lastNDaysRevenue(orders: AdminOrder[], n = 14): number[] {
 }
 
 export async function buildAdminState(me: { name: string; phone: string; role: StaffRole }): Promise<AdminState> {
-  const [rawOrders, catalog, settings, users, logs, coupons] = await Promise.all([
+  const [rawOrders, catalog, settings, users, logs, coupons, saladOrders, saladCatalog] = await Promise.all([
     listAllOrders(300),
     getLiveCatalog(),
     getStoreSettings(),
     User.find().sort({ createdAt: -1 }).limit(500).lean(),
     OtpLog.find().sort({ createdAt: -1 }).limit(80).lean(),
     listAllCoupons(),
+    listSaladOrders(300),
+    getSaladCatalogAll(),
   ]);
 
   const orders = rawOrders.map(toAdminOrder);
@@ -182,5 +190,7 @@ export async function buildAdminState(me: { name: string; phone: string; role: S
     revenueSeries: lastNDaysRevenue(orders),
     notifications,
     coupons,
+    saladOrders,
+    saladCatalog,
   };
 }

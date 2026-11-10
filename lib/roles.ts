@@ -22,7 +22,9 @@ export type AdminSection =
   | "security"
   | "settings"
   | "reports"
-  | "coupons";
+  | "coupons"
+  | "salad"
+  | "salad-catalog";
 
 const ALL_SECTIONS: AdminSection[] = [
   "dashboard",
@@ -38,13 +40,15 @@ const ALL_SECTIONS: AdminSection[] = [
   "settings",
   "reports",
   "coupons",
+  "salad",
+  "salad-catalog",
 ];
 
 export const ROLE_SECTIONS: Record<StaffRole, AdminSection[]> = {
   owner: ALL_SECTIONS,
-  orders: ["dashboard", "orders", "payments", "customers", "delivery", "coupons", "reports"],
-  catalog: ["dashboard", "products", "categories", "assistant", "reports"],
-  support: ["dashboard", "orders", "customers", "assistant", "coupons", "reports"],
+  orders: ["dashboard", "orders", "salad", "salad-catalog", "payments", "customers", "delivery", "coupons", "reports"],
+  catalog: ["dashboard", "products", "categories", "salad-catalog", "assistant", "reports"],
+  support: ["dashboard", "orders", "salad", "customers", "assistant", "coupons", "reports"],
 };
 
 export function isStaffRole(role?: string | null): role is StaffRole {
@@ -70,11 +74,17 @@ export function canMutate(
     | "settings"
     | "payments"
     | "coupons"
+    | "salad"
+    | "salad-catalog"
 ): boolean {
   if (role === "owner") return true;
   switch (action) {
     case "orders":
       return role === "orders" || role === "support";
+    case "salad":
+      return role === "orders" || role === "support";
+    case "salad-catalog":
+      return role === "catalog";
     case "orders.cancel":
       return role === "orders";
     case "payments":

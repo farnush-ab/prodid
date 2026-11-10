@@ -4,9 +4,9 @@
    ماده بر حسب «واحد» ذخیره می‌شود (هر واحد = unit گرم، یا برای
    اقلام عددی مثل تخم‌مرغ، یک عدد).
 
-   این داده فعلاً ثابت است و از پنل مدیریت خوانده نمی‌شود؛ وقتی
-   فهرست واقعی سالاد بار نهایی شد باید مثل کاتالوگ به دیتابیس
-   منتقل شود.
+   مثل lib/data.ts، این فایل فقط داده‌ی اولیه (seed) و تایپ‌هاست؛ بعد از
+   اولین اجرا منبع حقیقت دیتابیس است و پنل مدیریت همان را ویرایش می‌کند.
+   توابع محاسبه یک SaladCatalog می‌گیرند که پیش‌فرضش همین داده‌ی اولیه است.
    --------------------------------------------------------- */
 
 import { BRAND } from "./data";
@@ -44,6 +44,9 @@ export interface SaladIngredient {
   tags: SaladTag[];
   /** برای اقلام عددی: واحد شمارش، مثلا «عدد» */
   ulabel?: string;
+  /** عکس واقعی ماده؛ خالی یعنی همان طرح برداری رسم شود */
+  image?: string;
+  available?: boolean;
 }
 
 export interface SaladSauce {
@@ -55,14 +58,21 @@ export interface SaladSauce {
   pro: number;
   tags: SaladTag[];
   note: string;
+  available?: boolean;
 }
 
 export interface SaladPreset {
+  /** در داده‌ی اولیه خالی است و هنگام seed از روی نام ساخته می‌شود */
+  id?: string;
   n: string;
   d: string;
   size: string;
   items: Record<string, number>;
   sauces: string[];
+  /** قیمت دستی؛ خالی یعنی از روی مواد حساب شود */
+  price?: number | null;
+  image?: string;
+  available?: boolean;
 }
 
 /** یک سالادِ ساخته‌شده که به سفارش اضافه شده */
@@ -167,6 +177,45 @@ export const SALAD_MAX_UNITS = 12;
 /** هزینه ارسال سالاد (تومان) */
 export const SALAD_DELIVERY_FEE = 35000;
 
+export interface SaladCat {
+  id: string;
+  name: string;
+}
+
+/** همه‌ی داده‌ی سالاد بار در یک بسته — یا داده‌ی اولیه، یا آنچه از
+    دیتابیس آمده. توابع زیر این را می‌گیرند تا جایی به داده‌ی ثابت
+    گره نخورد. */
+export interface SaladCatalog {
+  cats: SaladCat[];
+  ingredients: SaladIngredient[];
+  sauces: SaladSauce[];
+  presets: SaladPreset[];
+  sizes: SaladBowlSize[];
+}
+
+export const SEED_SALAD_CATALOG: SaladCatalog = {
+  cats: SALAD_CATS.map((c) => ({ id: c.id, name: c.name })),
+  ingredients: SALAD_INGREDIENTS,
+  sauces: SALAD_SAUCES,
+  presets: SALAD_PRESETS.map((p, i) => ({ ...p, id: p.id || `preset-${i + 1}` })),
+  sizes: SALAD_SIZES,
+};
+
+export interface SaladIndex {
+  ing: Record<string, SaladIngredient>;
+  sauce: Record<string, SaladSauce>;
+  size: Record<string, SaladBowlSize>;
+}
+
+export function indexSalad(cat: SaladCatalog): SaladIndex {
+  return {
+    ing: Object.fromEntries(cat.ingredients.map((i) => [i.id, i])),
+    sauce: Object.fromEntries(cat.sauces.map((s) => [s.id, s])),
+    size: Object.fromEntries(cat.sizes.map((s) => [s.id, s])),
+  };
+}
+
+/* نگاشت‌های داده‌ی اولیه — هنوز به‌عنوان fallback استفاده می‌شوند */
 export const saladById: Record<string, SaladIngredient> = Object.fromEntries(SALAD_INGREDIENTS.map((i) => [i.id, i]));
 export const sauceById: Record<string, SaladSauce> = Object.fromEntries(SALAD_SAUCES.map((s) => [s.id, s]));
 export const sizeById: Record<string, SaladBowlSize> = Object.fromEntries(SALAD_SIZES.map((s) => [s.id, s]));
@@ -181,13 +230,21 @@ export interface SaladCalc {
   price: number;
 }
 
-export function saladCalc(items: Record<string, number>, sauces: string[], sizeId: string): SaladCalc {
+export function saladCalc(
+  items: Record<string, number>,
+  sauces: string[],
+  sizeId: string,
+  idx?: SaladIndex
+): SaladCalc {
+  const ingLookup = idx?.ing || saladById;
+  const sauceLookup = idx?.sauce || sauceById;
+  const sizeLookup = idx?.size || sizeById;
   let weight = 0;
   let kcal = 0;
   let pro = 0;
   let itemsPrice = 0;
   for (const id of Object.keys(items)) {
-    const ing = saladById[id];
+    const ing = ingLookup[id];
     const q = items[id];
     if (!ing || !q) continue;
     const grams = ing.g * q;
@@ -198,14 +255,14 @@ export function saladCalc(items: Record<string, number>, sauces: string[], sizeI
   }
   let saucePrice = 0;
   for (const sid of sauces) {
-    const s = sauceById[sid];
+    const s = sauceLookup[sid];
     if (!s) continue;
     saucePrice += s.price;
     weight += 30;
     kcal += (s.kcal * 30) / 100;
     pro += (s.pro * 30) / 100;
   }
-  const base = (sizeById[sizeId] || SALAD_SIZES[1]).base;
+  const base = (sizeLookup[sizeId] || SALAD_SIZES[1]).base;
   return {
     weight,
     kcal: Math.round(kcal),

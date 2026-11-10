@@ -12,9 +12,13 @@ function currentPageId(pathname: string | null) {
   return pathname.split("/")[1] || "index";
 }
 
+/* منوی اصلی (.main-nav) زیر ۷۶۸ پیکسل مخفی است، پس روی گوشی تنها راه
+   رسیدن به هر صفحه همین نوار پایین است؛ هر مسیری که باید روی موبایل
+   دیده شود باید این‌جا هم باشد، نه فقط در lib/nav.ts. */
 const ITEMS = [
   { id: "index", label: "خانه", ico: "home" },
   { id: "shop", label: "فروشگاه", ico: "store" },
+  { id: "salad-bar", label: "سالاد بار", ico: "bowl" },
   { id: "cart", label: "سبد خرید", ico: "cart", badge: true },
   { id: "account", label: "حساب", ico: "user" },
 ] as const;

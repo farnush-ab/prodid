@@ -19,29 +19,24 @@ import { BRAND } from "@/lib/data";
 import { toast } from "@/lib/toast";
 import { AppModal } from "@/components/AppModal";
 import {
-  SALAD_CATS,
   SALAD_DELIVERY_FEE,
   SALAD_DELIVERY_SLOTS,
   SALAD_DIETS,
-  SALAD_INGREDIENTS,
   SALAD_MAX_UNITS,
   SALAD_PICKUP_SLOTS,
-  SALAD_PRESETS,
-  SALAD_SAUCES,
-  SALAD_SIZES,
   dietAllows,
+  indexSalad,
   saladAmountLabel,
   saladCalc,
   saladOrderTotal,
   saladSlotLabel,
   saladWhatsappUrl,
-  saladById,
-  sauceById,
-  sizeById,
   type BuiltSalad,
   type SaladIngredient,
   type SaladWay,
 } from "@/lib/salad";
+import { useSaladCatalog } from "@/lib/catalog-store";
+import { saladImageSrc } from "@/lib/salad-image";
 import { SALAD_KIND, saladBowlSvg, saladIconSvg, saladPieceSvg } from "@/lib/salad-art";
 
 const CART_KEY = "prodid_saladbar";
@@ -150,6 +145,16 @@ function Svg({ html, className }: { html: string; className?: string }) {
 }
 
 export default function SaladBarPage() {
+  /* مواد، سس‌ها، دسته‌ها و سالادهای آماده از دیتابیس می‌آیند (پنل مدیریت
+     آن‌ها را می‌سازد)؛ تا رسیدن /api/catalog داده‌ی اولیه نشان داده می‌شود. */
+  const saladCat = useSaladCatalog();
+  const INGS = saladCat.ingredients;
+  const SAUCES = saladCat.sauces;
+  const PRESETS = saladCat.presets;
+  const CATS = saladCat.cats;
+  const SIZES = saladCat.sizes;
+  const idx = useMemo(() => indexSalad(saladCat), [saladCat]);
+
   const [size, setSize] = useState("m");
   const [items, setItems] = useState<Items>({ "kahoo-pich": 2, khiar: 1, goje: 1, morgh: 2, zorrat: 1 });
   const [sauces, setSauces] = useState<string[]>(["caesar"]);
@@ -164,6 +169,8 @@ export default function SaladBarPage() {
   const [pop, setPop] = useState<{ id: string; from: number } | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [orderNo, setOrderNo] = useState("");
   const bowlRef = useRef<HTMLDivElement | null>(null);
 
   /* نوار پایین این صفحه روی دکمه شناور دستیار می‌افتد؛ با این کلاس
@@ -193,21 +200,21 @@ export default function SaladBarPage() {
     }
   }, [cart]);
 
-  const calc = useMemo(() => saladCalc(items, sauces, size), [items, sauces, size]);
-  const cap = sizeById[size].cap;
+  const calc = useMemo(() => saladCalc(items, sauces, size, idx), [items, sauces, size, idx]);
+  const cap = idx.size[size].cap;
   const fill = calc.weight / cap;
   const itemCount = Object.keys(items).length;
-  const hasBase = useMemo(() => SALAD_INGREDIENTS.some((i) => i.cat === "base" && items[i.id]), [items]);
+  const hasBase = useMemo(() => INGS.some((i) => i.cat === "base" && items[i.id]), [items, INGS]);
   const totals = saladOrderTotal(cart, way || "pickup");
   const canAdd = hasBase && itemCount >= 2;
 
-  const bowlSvg = useMemo(() => saladBowlSvg(items, sauces, fill, { pop, toss }), [items, sauces, fill, pop, toss]);
-  const miniSvg = useMemo(() => saladBowlSvg(items, sauces, fill, { simple: true, toss }), [items, sauces, fill, toss]);
+  const bowlSvg = useMemo(() => saladBowlSvg(items, sauces, fill, { pop, toss, idx }), [items, sauces, fill, pop, toss, idx]);
+  const miniSvg = useMemo(() => saladBowlSvg(items, sauces, fill, { simple: true, toss, idx }), [items, sauces, fill, toss, idx]);
   const floaters = useMemo(() => Object.keys(items).slice(-4).reverse(), [items]);
 
   const setQty = useCallback(
     (id: string, next: number, tile?: HTMLElement | null) => {
-      const ing = saladById[id];
+      const ing = idx.ing[id];
       if (!ing) return;
       const before = items[id] || 0;
       const q = Math.max(0, Math.min(next, SALAD_MAX_UNITS));
@@ -231,7 +238,7 @@ export default function SaladBarPage() {
   );
 
   function loadPreset(i: number) {
-    const p = SALAD_PRESETS[i];
+    const p = PRESETS[i];
     setPop(null);
     setSize(p.size);
     setItems({ ...p.items });
@@ -253,7 +260,7 @@ export default function SaladBarPage() {
   function addToOrder() {
     if (!hasBase) return toast("اول یک برگ سبز پایه انتخاب کن");
     if (itemCount < 2) return toast("حداقل دو ماده لازم است");
-    const c = saladCalc(items, sauces, size);
+    const c = saladCalc(items, sauces, size, idx);
     setCart((prev) => [
       ...prev,
       {
@@ -315,9 +322,14 @@ export default function SaladBarPage() {
     setReviewOpen(true);
   }
 
-  function sendOrder() {
-    if (!way) return;
-    const url = saladWhatsappUrl({
+  /* سفارش هم در دیتابیس ثبت می‌شود (تا در پنل مدیریت دیده شود) و هم به
+     واتس‌اپ می‌رود (کانالی که فروشنده عملاً سفارش را از آن می‌گیرد).
+     اگر ثبت در سرور خطا بدهد، واتس‌اپ باز نمی‌شود و خطا را می‌گوییم —
+     وگرنه مشتری فکر می‌کند سفارش ثبت شده ولی در پنل خبری نیست. */
+  async function sendOrder() {
+    if (!way || sending) return;
+    setSending(true);
+    const draft = {
       salads: cart,
       way,
       slot,
@@ -325,13 +337,40 @@ export default function SaladBarPage() {
       phone: form.phone.trim(),
       address: form.address.trim(),
       note: form.note.trim(),
-    });
-    window.open(url, "_blank", "noopener");
-    setSent(true);
-    setReviewOpen(false);
+    };
+    try {
+      const res = await fetch("/api/salad-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...draft,
+          salads: cart.map((s) => ({
+            name: s.name,
+            size: s.size,
+            items: s.items,
+            sauces: s.sauces,
+            sauceSide: s.sauceSide,
+          })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data?.error || "ثبت سفارش انجام نشد؛ دوباره تلاش کن");
+        setSending(false);
+        return;
+      }
+      setOrderNo(String(data?.order?.orderNo || ""));
+      window.open(saladWhatsappUrl(draft), "_blank", "noopener");
+      setSent(true);
+      setReviewOpen(false);
+    } catch {
+      toast("اتصال برقرار نشد؛ دوباره تلاش کن");
+    } finally {
+      setSending(false);
+    }
   }
 
-  const visibleIngredients = SALAD_INGREDIENTS.filter((i) => i.cat === cat);
+  const visibleIngredients = INGS.filter((i) => i.cat === cat);
   const anyVisible = visibleIngredients.some((i) => dietAllows(diets, i.tags));
   const gap = BRAND.minOrder - totals.sub;
 
@@ -349,7 +388,7 @@ export default function SaladBarPage() {
           </p>
           <div className="sb-marks">
             <span>
-              <Icon name="leaf" className="ico" /> {faNum.format(SALAD_INGREDIENTS.length)} مادهٔ تازه
+              <Icon name="leaf" className="ico" /> {faNum.format(INGS.length)} مادهٔ تازه
             </span>
             <span>
               <Icon name="scale" className="ico" /> مقدار هر ماده دست خودت
@@ -361,20 +400,34 @@ export default function SaladBarPage() {
         </div>
       </section>
 
-      {/* نوار چسبان کاسه — فقط موبایل */}
+      {/* نوار چسبان کاسه — فقط موبایل. کارت بزرگ کاسه در ستون کناری است و
+          روی گوشی زیر کل فهرست مواد می‌افتد، پس حین انتخاب تنها جایی که
+          کاربر سالادش را می‌بیند همین است؛ به‌عمد بزرگ است. */}
       <div className="sb-rail">
         <div className="container sb-rail-in">
-          <Svg className="sb-rail-bowl" html={miniSvg} />
+          <button
+            type="button"
+            className="sb-rail-bowl"
+            onClick={() => document.getElementById("sb-bowl-card")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            aria-label="دیدن کاسهٔ کامل و ثبت سفارش"
+          >
+            <Svg html={miniSvg} />
+          </button>
           <div className="sb-rail-info">
             <b>{itemCount ? money(calc.price) : money(calc.base)}</b>
             <span>
               {itemCount
                 ? `${faNum.format(Math.round(calc.weight))} گرم · ${faNum.format(calc.kcal)} کالری`
-                : `کاسهٔ ${sizeById[size].name} — خالی`}
+                : `کاسهٔ ${idx.size[size].name} — هنوز خالی است`}
             </span>
             <i className={`sb-fillbar${fill > 1 ? " over" : ""}`}>
               <b style={{ width: `${Math.min(100, fill * 100)}%` }} />
             </i>
+            {itemCount ? (
+              <span className="sb-rail-hint">
+                <Icon name="chevron" className="ico" /> روی کاسه بزن تا کاملش را ببینی
+              </span>
+            ) : null}
           </div>
         </div>
       </div>
@@ -391,7 +444,7 @@ export default function SaladBarPage() {
               </div>
             </div>
             <div className="sb-sizes">
-              {SALAD_SIZES.map((s) => (
+              {SIZES.map((s) => (
                 <button
                   key={s.id}
                   type="button"
@@ -412,11 +465,16 @@ export default function SaladBarPage() {
             <h3 className="sb-sub">یا از یک سالاد آماده شروع کن</h3>
             <p className="sb-subnote">یکی را بزن تا در کاسه بنشیند، بعد هرچه خواستی کم و زیاد کن.</p>
             <div className="sb-presets">
-              {SALAD_PRESETS.map((p, i) => {
-                const c = saladCalc(p.items, p.sauces, p.size);
+              {PRESETS.map((p, i) => {
+                const c = saladCalc(p.items, p.sauces, p.size, idx);
                 return (
-                  <button key={p.n} type="button" className="sb-preset" onClick={() => loadPreset(i)}>
-                    <Svg className="sb-preset-art" html={saladBowlSvg(p.items, p.sauces, c.weight / sizeById[p.size].cap, { simple: true })} />
+                  <button key={p.id || p.n} type="button" className="sb-preset" onClick={() => loadPreset(i)}>
+                    {p.image ? (
+                      /* عکس واقعی که ادمین آپلود کرده؛ نبودش یعنی همان طرح برداری */
+                      <img className="sb-preset-art sb-preset-photo" src={saladImageSrc(p.image)} alt="" loading="lazy" />
+                    ) : (
+                      <Svg className="sb-preset-art" html={saladBowlSvg(p.items, p.sauces, c.weight / idx.size[p.size].cap, { simple: true, idx })} />
+                    )}
                     <span className="sb-preset-body">
                       <b>{p.n}</b>
                       <span className="sb-preset-desc">{p.d}</span>
@@ -424,7 +482,7 @@ export default function SaladBarPage() {
                         {faNum.format(c.kcal)} کالری · {faNum.format(c.pro)} گرم پروتئین
                       </span>
                       <span className="sb-preset-foot">
-                        <i>{money(c.price)}</i>
+                        <i>{money(p.price ?? c.price)}</i>
                         <em>بچین و عوض کن ←</em>
                       </span>
                     </span>
@@ -456,8 +514,8 @@ export default function SaladBarPage() {
               ))}
             </div>
             <nav className="sb-cats" aria-label="دسته‌بندی مواد">
-              {SALAD_CATS.map((c) => {
-                const n = SALAD_INGREDIENTS.filter((i) => i.cat === c.id && items[i.id]).length;
+              {CATS.map((c) => {
+                const n = INGS.filter((i) => i.cat === c.id && items[i.id]).length;
                 return (
                   <button key={c.id} type="button" className={`sb-cat${cat === c.id ? " on" : ""}`} onClick={() => setCat(c.id)}>
                     {c.name}
@@ -491,7 +549,11 @@ export default function SaladBarPage() {
                       }}
                     >
                       <span className="sb-stage">
-                        <Svg className="sb-art" html={saladIconSvg(i)} />
+                        {i.image ? (
+                          <img className="sb-art sb-art-photo" src={saladImageSrc(i.image)} alt="" loading="lazy" />
+                        ) : (
+                          <Svg className="sb-art" html={saladIconSvg(i)} />
+                        )}
                         {flag ? <span className="sb-flag">{flag}</span> : null}
                       </span>
                     </button>
@@ -538,7 +600,7 @@ export default function SaladBarPage() {
               </div>
             </div>
             <div className="sb-sauces">
-              {SALAD_SAUCES.map((s) => {
+              {SAUCES.map((s) => {
                 const on = sauces.includes(s.id);
                 const full = sauces.length >= 2 && !on;
                 const ok = dietAllows(diets, s.tags);
@@ -592,12 +654,12 @@ export default function SaladBarPage() {
                 <div className="sb-list">
                   {cart.map((s) => (
                     <div className="sb-row" key={s.key}>
-                      <Svg className="sb-row-art" html={saladBowlSvg(s.items, s.sauces, s.weight / sizeById[s.size].cap, { simple: true })} />
+                      <Svg className="sb-row-art" html={saladBowlSvg(s.items, s.sauces, s.weight / idx.size[s.size].cap, { simple: true, idx })} />
                       <span className="sb-row-main">
                         <b>{s.name}</b>
                         <span>
-                          کاسهٔ {sizeById[s.size].name} · {Object.keys(s.items).map((id) => saladById[id]?.n).filter(Boolean).join("، ")}
-                          {s.sauces.length ? ` · سس ${s.sauces.map((x) => sauceById[x]?.n).join(" و ")}` : ""}
+                          کاسهٔ {idx.size[s.size].name} · {Object.keys(s.items).map((id) => idx.ing[id]?.n).filter(Boolean).join("، ")}
+                          {s.sauces.length ? ` · سس ${s.sauces.map((x) => idx.sauce[x]?.n).join(" و ")}` : ""}
                         </span>
                       </span>
                       <span className="sb-row-side">
@@ -755,9 +817,9 @@ export default function SaladBarPage() {
 
         {/* ستون کاسه */}
         <aside className="sb-aside">
-          <div className="sb-card">
+          <div className="sb-card" id="sb-bowl-card">
             <div className="sb-card-top">
-              <h3>{itemCount ? `کاسهٔ ${sizeById[size].name}` : "کاسهٔ تو"}</h3>
+              <h3>{itemCount ? `کاسهٔ ${idx.size[size].name}` : "کاسهٔ تو"}</h3>
               <p>
                 {itemCount
                   ? `${faNum.format(itemCount)} ماده${sauces.length ? ` و ${faNum.format(sauces.length)} سس` : ""}`
@@ -767,7 +829,7 @@ export default function SaladBarPage() {
                 <Svg className="sb-bowl-art" html={bowlSvg} />
                 <span className="sb-floaters">
                   {floaters.map((id) =>
-                    saladById[id] ? <Svg key={id} className="sb-floater" html={saladPieceSvg(saladById[id])} /> : null
+                    idx.ing[id] ? <Svg key={id} className="sb-floater" html={saladPieceSvg(idx.ing[id])} /> : null
                   )}
                 </span>
                 {!itemCount && (
@@ -809,7 +871,7 @@ export default function SaladBarPage() {
               {itemCount || sauces.length ? (
                 <>
                   {Object.keys(items).map((id) => {
-                    const i = saladById[id];
+                    const i = idx.ing[id];
                     if (!i) return null;
                     return (
                       <span className="sb-chip" key={id}>
@@ -823,7 +885,7 @@ export default function SaladBarPage() {
                     );
                   })}
                   {sauces.map((sid) => {
-                    const s = sauceById[sid];
+                    const s = idx.sauce[sid];
                     if (!s) return null;
                     return (
                       <span className="sb-chip" key={sid}>
@@ -843,7 +905,7 @@ export default function SaladBarPage() {
 
             <div className="sb-bill">
               <div>
-                <span>پایهٔ کاسهٔ {sizeById[size].name}</span>
+                <span>پایهٔ کاسهٔ {idx.size[size].name}</span>
                 <b>{faNum.format(calc.base)}</b>
               </div>
               <div>
@@ -911,15 +973,15 @@ export default function SaladBarPage() {
             {cart.map((s) => (
               <div className="sb-sum" key={s.key}>
                 <h4>
-                  {s.name} — کاسهٔ {sizeById[s.size].name} · {faNum.format(Math.round(s.weight))} گرم ·{" "}
+                  {s.name} — کاسهٔ {idx.size[s.size].name} · {faNum.format(Math.round(s.weight))} گرم ·{" "}
                   {faNum.format(s.kcal)} کالری · {faNum.format(s.pro)} گرم پروتئین
                 </h4>
                 <div className="sb-sum-line">
                   <span>پایهٔ کاسه</span>
-                  <b>{faNum.format(sizeById[s.size].base)}</b>
+                  <b>{faNum.format(idx.size[s.size].base)}</b>
                 </div>
                 {Object.keys(s.items).map((id) => {
-                  const ing = saladById[id];
+                  const ing = idx.ing[id];
                   if (!ing) return null;
                   return (
                     <div className="sb-sum-line" key={id}>
@@ -933,10 +995,10 @@ export default function SaladBarPage() {
                 {s.sauces.map((x) => (
                   <div className="sb-sum-line" key={x}>
                     <span>
-                      سس {sauceById[x]?.n}
+                      سس {idx.sauce[x]?.n}
                       {s.sauceSide ? " (جدا)" : ""}
                     </span>
-                    <b>{faNum.format(sauceById[x]?.price || 0)}</b>
+                    <b>{faNum.format(idx.sauce[x]?.price || 0)}</b>
                   </div>
                 ))}
                 <div className="sb-sum-line strong">
@@ -979,8 +1041,8 @@ export default function SaladBarPage() {
             <button type="button" className="btn btn-light" onClick={() => setReviewOpen(false)}>
               برگشت
             </button>
-            <button type="button" className="btn btn-primary" onClick={sendOrder}>
-              <Icon name="chat" className="ico" /> ثبت سفارش در واتس‌اپ
+            <button type="button" className="btn btn-primary" onClick={sendOrder} disabled={sending}>
+              <Icon name="chat" className="ico" /> {sending ? "در حال ثبت…" : "ثبت سفارش در واتس‌اپ"}
             </button>
           </div>
         </AppModal>
@@ -990,8 +1052,8 @@ export default function SaladBarPage() {
         <AppModal title="سفارشت فرستاده شد" icon="check" onClose={() => setSent(false)}>
           <div className="sb-done">
             <p>
-              سفارش سالادت در واتس‌اپ برای پرودید باز شد. اگر پیام ارسال نشد، صفحهٔ واتس‌اپ را چک کن و دکمهٔ ارسال را
-              بزن.
+              سفارشت ثبت شد{orderNo ? ` و شمارهٔ آن ${orderNo} است` : ""}. صفحهٔ واتس‌اپ هم برای پرودید باز شد؛ اگر پیام
+              ارسال نشد، آن صفحه را چک کن و دکمهٔ ارسال را بزن.
             </p>
             <p className="sb-note">شمارهٔ فروشگاه: {BRAND.phone}</p>
             <div className="sb-modal-foot">

@@ -12,7 +12,7 @@
    و با dangerouslySetInnerHTML رندر می‌شود.
    --------------------------------------------------------- */
 
-import type { SaladIngredient, SaladSauce } from "./salad";
+import type { SaladIndex, SaladIngredient, SaladSauce } from "./salad";
 import { saladById, sauceById } from "./salad";
 
 /* ---------- شناسهٔ یکتا برای هر SVG ----------
@@ -326,6 +326,8 @@ export interface BowlOptions {
   pop?: { id: string; from: number } | null;
   /** با هر «هم زدن» جای همهٔ قطعه‌ها عوض می‌شود */
   toss?: number;
+  /** مواد زنده از دیتابیس؛ نیامده یعنی همان داده‌ی اولیه */
+  idx?: SaladIndex;
 }
 
 /** نمای از بالای کاسه به صورت رشتهٔ SVG */
@@ -344,7 +346,7 @@ export function saladBowlSvg(
   const pieces: { ing: SaladIngredient; k: KindSpec; idx: number; slot: { x: number; y: number }; rnd: () => number }[] = [];
 
   for (const id of Object.keys(items)) {
-    const ing = saladById[id];
+    const ing = (opts.idx?.ing || saladById)[id];
     if (!ing || !items[id]) continue;
     used.push(ing);
     const k = SALAD_KIND[ing.kind] || SALAD_KIND.kernel;
@@ -389,7 +391,7 @@ export function saladBowlSvg(
   /* سس روی همه «ریخته» می‌شود: چند خط نازکِ موج‌دار، نه یک نوار کلفت */
   let sg = "";
   sauces.forEach((sid, si) => {
-    const s: SaladSauce | undefined = sauceById[sid];
+    const s: SaladSauce | undefined = (opts.idx?.sauce || sauceById)[sid];
     if (!s) return;
     const rnd = mulberry(hash(sid) + si * 7);
     let d = "";
