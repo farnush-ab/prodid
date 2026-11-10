@@ -179,7 +179,7 @@ Notes that will save you an hour:
 | Change products, prices, categories, photos, coupons, delivery slots, SMS text | Use `/admin`. Do not edit code |
 | Change the seed for a brand-new database | `lib/data.ts` (`price: null` = «قیمت روی تماس», `available: false` = out of stock, `sale: "w"` = per-kg / `"u"` = per package) |
 | Add a storefront page | New folder under `app/(site)/`, `"use client"` page, plus a `layout.tsx` exporting only `metadata` if it needs a title |
-| Add it to the menu | `lib/nav.ts` — one array feeds both `Header` and `Footer` |
+| Add it to the menu | **Two places.** `lib/nav.ts` feeds the desktop header and the footer; `components/BottomNav.tsx` has its own hardcoded list and is the *only* navigation on a phone, because `.main-nav` is `display: none` below 768px. A link added to `lib/nav.ts` alone is unreachable on mobile |
 | Add an icon | `lib/icons.tsx` |
 | Add an admin section | A view in `components/admin/`, a tab in `app/admin/page.tsx`, a route under `app/api/admin/`, and the section name in `lib/roles.ts` |
 | Add a field to a catalog entity | Model in `models/`, `toProduct`/`toCategory` in `lib/catalog-server.ts`, the type in `lib/data.ts`, the admin API's sanitiser, the admin view, and the storefront component. All six, or it silently drops |
