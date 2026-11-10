@@ -23,7 +23,8 @@ export type AdminSection =
   | "settings"
   | "reports"
   | "coupons"
-  | "salad";
+  | "salad"
+  | "salad-catalog";
 
 const ALL_SECTIONS: AdminSection[] = [
   "dashboard",
@@ -40,12 +41,13 @@ const ALL_SECTIONS: AdminSection[] = [
   "reports",
   "coupons",
   "salad",
+  "salad-catalog",
 ];
 
 export const ROLE_SECTIONS: Record<StaffRole, AdminSection[]> = {
   owner: ALL_SECTIONS,
-  orders: ["dashboard", "orders", "salad", "payments", "customers", "delivery", "coupons", "reports"],
-  catalog: ["dashboard", "products", "categories", "assistant", "reports"],
+  orders: ["dashboard", "orders", "salad", "salad-catalog", "payments", "customers", "delivery", "coupons", "reports"],
+  catalog: ["dashboard", "products", "categories", "salad-catalog", "assistant", "reports"],
   support: ["dashboard", "orders", "salad", "customers", "assistant", "coupons", "reports"],
 };
 
@@ -73,6 +75,7 @@ export function canMutate(
     | "payments"
     | "coupons"
     | "salad"
+    | "salad-catalog"
 ): boolean {
   if (role === "owner") return true;
   switch (action) {
@@ -80,6 +83,8 @@ export function canMutate(
       return role === "orders" || role === "support";
     case "salad":
       return role === "orders" || role === "support";
+    case "salad-catalog":
+      return role === "catalog";
     case "orders.cancel":
       return role === "orders";
     case "payments":

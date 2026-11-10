@@ -22,13 +22,13 @@ import {
   SALAD_DELIVERY_SLOTS,
   SALAD_MAX_UNITS,
   SALAD_PICKUP_SLOTS,
-  saladById,
+  indexSalad,
   saladCalc,
   saladSlotLabel,
-  sauceById,
-  sizeById,
+  type SaladIndex,
   type SaladWay,
 } from "@/lib/salad";
+import { getSaladCatalog } from "@/lib/salad-catalog-server";
 import type { PublicSaladOrder, SaladOrderLine } from "@/lib/salad-order";
 
 const SALAD_STATUS_PATTERN: Partial<Record<OrderStatus, SmsPattern>> = {
@@ -58,14 +58,14 @@ function isWay(v: string): v is SaladWay {
 }
 
 /** یک سالاد را از ورودی خام می‌سازد و قیمت/وزن را از نو حساب می‌کند */
-function buildSalad(raw: CreateSaladOrderInput["salads"][number], index: number): SaladOrderLine {
-  const size = sizeById[String(raw.size)];
+function buildSalad(raw: CreateSaladOrderInput["salads"][number], index: number, idx: SaladIndex): SaladOrderLine {
+  const size = idx.size[String(raw.size)];
   if (!size) throw new OrderError(`اندازهٔ کاسهٔ سالاد ${index + 1} نامعتبر است`);
 
   const items: SaladOrderLine["items"] = [];
   const cleanItems: Record<string, number> = {};
   for (const [id, rawQty] of Object.entries(raw.items || {})) {
-    const ing = saladById[id];
+    const ing = idx.ing[id];
     if (!ing) throw new OrderError(`مادهٔ «${id}» در سالاد ${index + 1} شناخته نشد`);
     const units = Math.floor(Number(rawQty));
     if (!Number.isFinite(units) || units <= 0) continue;
@@ -86,14 +86,14 @@ function buildSalad(raw: CreateSaladOrderInput["salads"][number], index: number)
   const sauceIds: string[] = [];
   const sauces: SaladOrderLine["sauces"] = [];
   for (const sid of raw.sauces || []) {
-    const s = sauceById[String(sid)];
+    const s = idx.sauce[String(sid)];
     if (!s) throw new OrderError(`سس «${sid}» شناخته نشد`);
     if (sauceIds.includes(s.id)) continue;
     sauceIds.push(s.id);
     sauces.push({ id: s.id, name: s.n });
   }
 
-  const calc = saladCalc(cleanItems, sauceIds, size.id);
+  const calc = saladCalc(cleanItems, sauceIds, size.id, idx);
   if (calc.weight > size.cap * 1.05) {
     throw new OrderError(`سالاد ${index + 1} از ظرفیت کاسهٔ ${size.name} بیشتر است`);
   }
@@ -174,7 +174,9 @@ export async function createSaladOrder(
     throw new OrderError(`در هر سفارش حداکثر ${MAX_SALADS_PER_ORDER} سالاد می‌شود ثبت کرد`);
   }
 
-  const salads = rawSalads.map(buildSalad);
+  const saladCatalog = await getSaladCatalog();
+  const idx = indexSalad(saladCatalog);
+  const salads = rawSalads.map((raw, i) => buildSalad(raw, i, idx));
   const subtotal = salads.reduce((a, s) => a + s.price, 0);
   const deliveryFee = way === "delivery" ? SALAD_DELIVERY_FEE : 0;
 

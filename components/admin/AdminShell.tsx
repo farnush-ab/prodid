@@ -20,7 +20,8 @@ export type AdminView =
   | "settings"
   | "reports"
   | "coupons"
-  | "salad";
+  | "salad"
+  | "salad-catalog";
 
 interface NavItem {
   id: AdminView;
@@ -38,7 +39,7 @@ const NAV: NavGroup[] = [
     label: "فروش",
     items: [
       { id: "orders", label: "سفارش‌ها", icon: "package" },
-      { id: "salad", label: "سالاد بار", icon: "bowl" },
+      { id: "salad", label: "سفارش سالاد", icon: "bowl" },
       { id: "payments", label: "پرداخت‌ها", icon: "wallet" },
       { id: "coupons", label: "تخفیف‌ها", icon: "award" },
     ],
@@ -47,6 +48,7 @@ const NAV: NavGroup[] = [
     label: "فروشگاه",
     items: [
       { id: "products", label: "محصولات", icon: "box" },
+      { id: "salad-catalog", label: "مواد سالاد بار", icon: "leaf" },
       { id: "categories", label: "دسته‌بندی‌ها", icon: "store" },
     ],
   },

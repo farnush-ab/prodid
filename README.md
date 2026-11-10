@@ -100,6 +100,14 @@ This trips people up, including the current `CLAUDE.md`:
   pushes it into the `lib/catalog-store.ts` snapshot, which client components read.
 - So **editing `lib/data.ts` does not change a running shop.** It only affects a fresh, empty
   database. Real catalog edits happen in `/admin`.
+- **`lib/salad.ts` works the same way** for the salad bar: it seeds `SaladCategory`,
+  `SaladIngredient`, `SaladSauce` and `SaladPreset` (see `lib/salad-catalog-server.ts`), and after
+  that the admin's «مواد سالاد بار» tab owns the data. The functions in `lib/salad.ts` take an
+  optional `SaladIndex` so nothing is hard-wired to the seed — pass the live one (`indexSalad()`
+  over `useSaladCatalog()`) or the seed is used as a fallback.
+- `app/api/catalog/route.ts` **must stay `dynamic = "force-dynamic"`.** Without it Next prerenders
+  the route at build time and the whole storefront serves a frozen catalog, so nothing an admin
+  changes ever appears until the next deploy. This bit us once already.
 
 ### API surface
 
@@ -150,7 +158,7 @@ panel return 500 — expect that in a sandbox and do not "fix" it by mocking the
 ```bash
 npm run build                   # production build
 npm run start                   # serve the build
-npm run lint                    # next lint
+npm run lint                    # next lint — NOT configured: it prompts to set ESLint up, so it is not part of the bar
 npx tsc --noEmit                # typecheck — there is no test suite
 ```
 

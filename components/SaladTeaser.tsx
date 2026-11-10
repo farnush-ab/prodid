@@ -7,7 +7,9 @@ import { faNum } from "@/lib/format";
 import { pageHref } from "@/lib/page";
 import { useReveal } from "@/components/Reveal";
 import { saladBowlSvg } from "@/lib/salad-art";
-import { SALAD_INGREDIENTS, SALAD_PRESETS, SALAD_SIZES, saladCalc } from "@/lib/salad";
+import { indexSalad, saladCalc } from "@/lib/salad";
+import { useSaladCatalog } from "@/lib/catalog-store";
+import { saladImageSrc } from "@/lib/salad-image";
 
 /* هر چند ثانیه یک سالاد دیگر در کاسه ساخته می‌شود تا کاربر تنوع را ببیند
    و کاسه «زنده» به نظر برسد. با prefers-reduced-motion فقط اولی می‌ماند. */
@@ -16,21 +18,28 @@ const ROTATE_MS = 3400;
 export function SaladTeaser() {
   const box = useReveal<HTMLDivElement>();
   const [i, setI] = useState(0);
+  const saladCat = useSaladCatalog();
+  const PRESETS = saladCat.presets.length ? saladCat.presets : [];
+  const idx = useMemo(() => indexSalad(saladCat), [saladCat]);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const t = setInterval(() => setI((n) => (n + 1) % SALAD_PRESETS.length), ROTATE_MS);
+    if (PRESETS.length < 2) return;
+    const t = setInterval(() => setI((n) => (n + 1) % PRESETS.length), ROTATE_MS);
     return () => clearInterval(t);
-  }, []);
+  }, [PRESETS.length]);
 
-  const preset = SALAD_PRESETS[i];
+  const preset = PRESETS[i % Math.max(1, PRESETS.length)];
+  /* اگر ادمین همهٔ سالادهای آماده را حذف کند، کاسهٔ خالی نشان می‌دهیم
+     تا این بخش نشکند. */
   const bowl = useMemo(() => {
-    const calc = saladCalc(preset.items, preset.sauces, preset.size);
-    const cap = SALAD_SIZES.find((s) => s.id === preset.size)?.cap || 550;
-    return saladBowlSvg(preset.items, preset.sauces, Math.min(1, calc.weight / cap), { simple: true });
-  }, [preset]);
+    if (!preset) return saladBowlSvg({}, [], 0, { simple: true, idx });
+    const calc = saladCalc(preset.items, preset.sauces, preset.size, idx);
+    const cap = idx.size[preset.size]?.cap || 550;
+    return saladBowlSvg(preset.items, preset.sauces, Math.min(1, calc.weight / cap), { simple: true, idx });
+  }, [preset, idx]);
 
-  const cheapest = useMemo(() => Math.min(...SALAD_SIZES.map((s) => s.base)), []);
+  const cheapest = useMemo(() => Math.min(...saladCat.sizes.map((s) => s.base)), [saladCat.sizes]);
 
   return (
     <div className="container">
@@ -48,7 +57,7 @@ export function SaladTeaser() {
           </p>
           <div className="sbt-marks">
             <span>
-              <Icon name="leaf" className="ico" /> {faNum.format(SALAD_INGREDIENTS.length)} مادهٔ تازه
+              <Icon name="leaf" className="ico" /> {faNum.format(saladCat.ingredients.length)} مادهٔ تازه
             </span>
             <span>
               <Icon name="scale" className="ico" /> مقدارش با خودت
@@ -70,12 +79,18 @@ export function SaladTeaser() {
 
         <div className="sbt-art" aria-hidden="true">
           <Link href={pageHref("salad-bar")} className="sbt-bowl" tabIndex={-1} aria-hidden="true">
-            <span key={preset.n} dangerouslySetInnerHTML={{ __html: bowl }} />
+            {preset?.image ? (
+              <img key={preset.id || preset.n} src={saladImageSrc(preset.image)} alt="" />
+            ) : (
+              <span key={preset?.n || "empty"} dangerouslySetInnerHTML={{ __html: bowl }} />
+            )}
           </Link>
-          <span className="sbt-tag" key={`t-${preset.n}`}>
-            <b>{preset.n}</b>
-            {preset.d}
-          </span>
+          {preset ? (
+            <span className="sbt-tag" key={`t-${preset.n}`}>
+              <b>{preset.n}</b>
+              {preset.d}
+            </span>
+          ) : null}
         </div>
       </section>
     </div>

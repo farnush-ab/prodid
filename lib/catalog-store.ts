@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { BRAND, CATEGORIES, PRODUCTS, type Category, type Product } from "@/lib/data";
 import { INTRO_MSG, PEEK_MSG, RECIPES, type RecipeTip } from "@/lib/assistant-content";
+import { SEED_SALAD_CATALOG, type SaladCatalog } from "@/lib/salad";
 import { DELIVERY_DAYS, DELIVERY_SLOTS } from "@/lib/order";
 import type { BrandInfo, DeliveryToggle, DeliveryZone, StoreFeatures } from "@/lib/store-settings";
 
@@ -22,6 +23,7 @@ export interface PublicCatalog {
     defaultOn: boolean;
     recipes: RecipeTip[];
   };
+  salad: SaladCatalog;
 }
 
 export const DEFAULT_CATALOG: PublicCatalog = {
@@ -48,6 +50,7 @@ export const DEFAULT_CATALOG: PublicCatalog = {
     defaultOn: true,
     recipes: RECIPES,
   },
+  salad: SEED_SALAD_CATALOG,
 };
 
 let snapshot: PublicCatalog = DEFAULT_CATALOG;
@@ -79,4 +82,9 @@ export function getLiveCategory(id: string | null | undefined): Category | undef
 
 export function useCatalog(): PublicCatalog {
   return useSyncExternalStore(subscribeCatalog, getCatalogSnapshot, () => DEFAULT_CATALOG);
+}
+
+/** کاتالوگ سالاد بار — تا وقتی /api/catalog نیامده، داده‌ی اولیه */
+export function useSaladCatalog(): SaladCatalog {
+  return useCatalog().salad || SEED_SALAD_CATALOG;
 }
