@@ -228,10 +228,13 @@ find, because it shows up as a blank render, a hydration crash or a phone-only v
    reorders them (`PRODID1@`). Scope `dir="ltr"` to the Latin-only span.
 8. **Persian digits everywhere in the UI.** `toLocaleString("fa-IR")` with `٬` as the thousands
    separator. A stray `100 گرم` next to `۱۴٬۰۰۰` is a visible bug.
-9. **Never commit secrets.** `.env*.local` is gitignored and must stay out of git.
-   ⚠️ `.env.example` is committed and currently contains what looks like a **real IPPanel API key
-   and pattern codes**. It should be rotated and replaced with empty placeholders. Do not copy that
-   key anywhere, and never add a live secret to a tracked file.
+9. **Never commit secrets.** `.gitignore` covers `.env` and `.env.*` with a single exception for
+   `.env.example`, which is a template: variable names only, never a value. Real values live in
+   `.env.local` (development) and `.env` on the server (`docker-compose.yml` loads it with
+   `env_file: .env`, which is why that path must stay ignored).
+   ⚠️ A live IPPanel API key was committed in `.env.example` until it was emptied; **it is still in
+   git history**, so that key must be revoked and reissued in the IPPanel panel. Emptying the file
+   does not undo the exposure.
 10. **Never run `npm audit fix --force`.** It upgrades Next.js to 16 and breaks the project. Patch
     advisories by hand, within the 14.2 line.
 11. **`uploads/` is runtime data, not source.** Uploaded product and category images live there and
@@ -282,7 +285,7 @@ curl -I http://127.0.0.1:3200/        # باید ۲۰۰ بدهد
 ## Suggested next steps
 
 - Show salad orders in the customer's own order history too (they are filtered out of it today).
-- Rotate the IPPanel key and empty out `.env.example`.
+- Revoke and reissue the IPPanel API key — the old one is in git history (`.env.example` itself is clean now).
 - Replace the procedural salad ingredient art with real photographs once the shop provides them
   (`lib/salad-art.ts` already has an image slot for this).
 - Refresh `CLAUDE.md` so the admin-API and catalog-source sections match reality.
