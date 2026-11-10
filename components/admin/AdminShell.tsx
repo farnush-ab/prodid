@@ -19,7 +19,8 @@ export type AdminView =
   | "security"
   | "settings"
   | "reports"
-  | "coupons";
+  | "coupons"
+  | "salad";
 
 interface NavItem {
   id: AdminView;
@@ -37,6 +38,7 @@ const NAV: NavGroup[] = [
     label: "فروش",
     items: [
       { id: "orders", label: "سفارش‌ها", icon: "package" },
+      { id: "salad", label: "سالاد بار", icon: "bowl" },
       { id: "payments", label: "پرداخت‌ها", icon: "wallet" },
       { id: "coupons", label: "تخفیف‌ها", icon: "award" },
     ],

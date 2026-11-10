@@ -164,6 +164,8 @@ export default function SaladBarPage() {
   const [pop, setPop] = useState<{ id: string; from: number } | null>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [orderNo, setOrderNo] = useState("");
   const bowlRef = useRef<HTMLDivElement | null>(null);
 
   /* نوار پایین این صفحه روی دکمه شناور دستیار می‌افتد؛ با این کلاس
@@ -315,9 +317,14 @@ export default function SaladBarPage() {
     setReviewOpen(true);
   }
 
-  function sendOrder() {
-    if (!way) return;
-    const url = saladWhatsappUrl({
+  /* سفارش هم در دیتابیس ثبت می‌شود (تا در پنل مدیریت دیده شود) و هم به
+     واتس‌اپ می‌رود (کانالی که فروشنده عملاً سفارش را از آن می‌گیرد).
+     اگر ثبت در سرور خطا بدهد، واتس‌اپ باز نمی‌شود و خطا را می‌گوییم —
+     وگرنه مشتری فکر می‌کند سفارش ثبت شده ولی در پنل خبری نیست. */
+  async function sendOrder() {
+    if (!way || sending) return;
+    setSending(true);
+    const draft = {
       salads: cart,
       way,
       slot,
@@ -325,10 +332,37 @@ export default function SaladBarPage() {
       phone: form.phone.trim(),
       address: form.address.trim(),
       note: form.note.trim(),
-    });
-    window.open(url, "_blank", "noopener");
-    setSent(true);
-    setReviewOpen(false);
+    };
+    try {
+      const res = await fetch("/api/salad-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...draft,
+          salads: cart.map((s) => ({
+            name: s.name,
+            size: s.size,
+            items: s.items,
+            sauces: s.sauces,
+            sauceSide: s.sauceSide,
+          })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast(data?.error || "ثبت سفارش انجام نشد؛ دوباره تلاش کن");
+        setSending(false);
+        return;
+      }
+      setOrderNo(String(data?.order?.orderNo || ""));
+      window.open(saladWhatsappUrl(draft), "_blank", "noopener");
+      setSent(true);
+      setReviewOpen(false);
+    } catch {
+      toast("اتصال برقرار نشد؛ دوباره تلاش کن");
+    } finally {
+      setSending(false);
+    }
   }
 
   const visibleIngredients = SALAD_INGREDIENTS.filter((i) => i.cat === cat);
@@ -993,8 +1027,8 @@ export default function SaladBarPage() {
             <button type="button" className="btn btn-light" onClick={() => setReviewOpen(false)}>
               برگشت
             </button>
-            <button type="button" className="btn btn-primary" onClick={sendOrder}>
-              <Icon name="chat" className="ico" /> ثبت سفارش در واتس‌اپ
+            <button type="button" className="btn btn-primary" onClick={sendOrder} disabled={sending}>
+              <Icon name="chat" className="ico" /> {sending ? "در حال ثبت…" : "ثبت سفارش در واتس‌اپ"}
             </button>
           </div>
         </AppModal>
@@ -1004,8 +1038,8 @@ export default function SaladBarPage() {
         <AppModal title="سفارشت فرستاده شد" icon="check" onClose={() => setSent(false)}>
           <div className="sb-done">
             <p>
-              سفارش سالادت در واتس‌اپ برای پرودید باز شد. اگر پیام ارسال نشد، صفحهٔ واتس‌اپ را چک کن و دکمهٔ ارسال را
-              بزن.
+              سفارشت ثبت شد{orderNo ? ` و شمارهٔ آن ${orderNo} است` : ""}. صفحهٔ واتس‌اپ هم برای پرودید باز شد؛ اگر پیام
+              ارسال نشد، آن صفحه را چک کن و دکمهٔ ارسال را بزن.
             </p>
             <p className="sb-note">شمارهٔ فروشگاه: {BRAND.phone}</p>
             <div className="sb-modal-foot">

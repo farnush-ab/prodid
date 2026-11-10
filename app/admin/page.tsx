@@ -15,6 +15,7 @@ import { TeamView } from "@/components/admin/TeamView";
 import { SettingsView } from "@/components/admin/SettingsView";
 import { ReportsView } from "@/components/admin/ReportsView";
 import { CouponsView } from "@/components/admin/CouponsView";
+import { SaladBarView } from "@/components/admin/SaladBarView";
 import { toast } from "@/lib/toast";
 import { adminFetch } from "@/lib/admin-client";
 import { canAccessSection, canMutate, type StaffRole } from "@/lib/roles";
@@ -26,6 +27,7 @@ import type { StoreSettings } from "@/lib/store-settings";
 import { DEFAULT_SETTINGS } from "@/lib/store-settings";
 import type { AdminMe, AdminNotification, AdminState } from "@/lib/admin-state";
 import type { CouponRecord } from "@/lib/coupon";
+import type { PublicSaladOrder } from "@/lib/salad-order";
 
 type AdminProduct = Product & { sold: number };
 
@@ -46,6 +48,7 @@ export default function AdminPage() {
   const [revenueSeries, setRevenueSeries] = useState<number[]>(Array(14).fill(0));
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [coupons, setCoupons] = useState<CouponRecord[]>([]);
+  const [saladOrders, setSaladOrders] = useState<PublicSaladOrder[]>([]);
 
   const applyState = useCallback((state: AdminState) => {
     setMe(state.me);
@@ -59,6 +62,7 @@ export default function AdminPage() {
     setRevenueSeries(state.revenueSeries);
     setNotifications(state.notifications);
     setCoupons(state.coupons);
+    setSaladOrders(state.saladOrders);
   }, []);
 
   const reload = useCallback(async () => {
@@ -84,6 +88,7 @@ export default function AdminPage() {
         setRevenueSeries(state.revenueSeries);
         setNotifications(state.notifications);
         setCoupons(state.coupons);
+        setSaladOrders(state.saladOrders);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "بارگذاری پنل انجام نشد");
       } finally {
@@ -228,6 +233,30 @@ export default function AdminPage() {
                 body: JSON.stringify({ section: "payments", payments, features: { ...settings.features, onlinePay } }),
               });
               setSettings(data.settings);
+            });
+          }}
+        />
+      )}
+      {view === "salad" && (
+        <SaladBarView
+          orders={saladOrders}
+          canEdit={canMutate(role, "salad")}
+          onAdvance={async (orderNo) => {
+            await run("وضعیت سفارش سالاد به‌روز شد", async () => {
+              const data = await adminFetch<{ order: PublicSaladOrder }>(
+                `/api/admin/salad-orders/${encodeURIComponent(orderNo)}`,
+                { method: "PATCH", body: JSON.stringify({ action: "advance" }) }
+              );
+              setSaladOrders((prev) => prev.map((o) => (o.orderNo === orderNo ? data.order : o)));
+            });
+          }}
+          onCancel={async (orderNo) => {
+            await run("سفارش سالاد لغو شد", async () => {
+              const data = await adminFetch<{ order: PublicSaladOrder }>(
+                `/api/admin/salad-orders/${encodeURIComponent(orderNo)}`,
+                { method: "PATCH", body: JSON.stringify({ action: "cancel" }) }
+              );
+              setSaladOrders((prev) => prev.map((o) => (o.orderNo === orderNo ? data.order : o)));
             });
           }}
         />

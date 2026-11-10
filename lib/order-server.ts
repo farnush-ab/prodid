@@ -233,9 +233,14 @@ export async function createOrder(
   return publicOrder;
 }
 
+/* سفارش‌های سالاد در همین مجموعه‌اند ولی items خالی دارند و شکلشان با
+   سفارش فروشگاه فرق می‌کند، پس از این فهرست‌ها کنار گذاشته می‌شوند؛
+   تب «سالاد بار» در پنل با listSaladOrders آن‌ها را می‌خواند. */
+const SHOP_ONLY = { kind: { $ne: "salad" } } as const;
+
 export async function listAllOrders(limit = 200) {
   await dbConnect();
-  const docs = await Order.find().sort({ createdAt: -1 }).limit(limit);
+  const docs = await Order.find(SHOP_ONLY).sort({ createdAt: -1 }).limit(limit);
   return docs.map((d) => toPublicOrder(d));
 }
 
@@ -247,6 +252,7 @@ export async function listOrdersForUser(user: { id: string; phone: string }) {
   );
 
   const docs = await Order.find({
+    ...SHOP_ONLY,
     $or: [{ userId: user.id }, { "customer.phone": user.phone }],
   })
     .sort({ createdAt: -1 })

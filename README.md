@@ -181,6 +181,7 @@ Notes that will save you an hour:
 | Add a storefront page | New folder under `app/(site)/`, `"use client"` page, plus a `layout.tsx` exporting only `metadata` if it needs a title |
 | Add it to the menu | **Two places.** `lib/nav.ts` feeds the desktop header and the footer; `components/BottomNav.tsx` has its own hardcoded list and is the *only* navigation on a phone, because `.main-nav` is `display: none` below 768px. A link added to `lib/nav.ts` alone is unreachable on mobile |
 | Add an icon | `lib/icons.tsx` |
+| Add an admin tab | A view in `components/admin/`, the id in `AdminView`+nav in `components/admin/AdminShell.tsx`, the section in `lib/roles.ts` (type, `ALL_SECTIONS`, `ROLE_SECTIONS`, `canMutate`), the data in `lib/admin-state.ts`, and the block in `app/admin/page.tsx` |
 | Add an admin section | A view in `components/admin/`, a tab in `app/admin/page.tsx`, a route under `app/api/admin/`, and the section name in `lib/roles.ts` |
 | Add a field to a catalog entity | Model in `models/`, `toProduct`/`toCategory` in `lib/catalog-server.ts`, the type in `lib/data.ts`, the admin API's sanitiser, the admin view, and the storefront component. All six, or it silently drops |
 | Add styling | Append to `app/globals.css` with a new prefix (`.sb-` for salad bar, `.adm-` for admin) and reuse the existing tokens: `--brand-orange-solid`, `--espresso-800`, `--line`, `--radius`, `--ease`, `--bottomnav-h` |
@@ -235,9 +236,13 @@ find, because it shows up as a blank render, a hydration crash or a phone-only v
 
 ## Known gaps — do not mistake these for bugs
 
-- **Salad bar orders go to WhatsApp only.** They are not written to the `Order` collection and so
-  never appear in the admin order list. Fixing that means teaching the `Order` model a salad line
-  item (ingredients + amounts + sauces), not patching the page.
+- **Salad orders are stored, but in their own lane.** They live in the same `orders` collection
+  with `kind: "salad"` and a `salads` array (ingredients, grams, sauces, bowl size, macros), and
+  are served by `lib/salad-order-server.ts` to the admin's «سالاد بار» tab. The shop order lists
+  deliberately exclude them (`SHOP_ONLY` in `lib/order-server.ts`), because their `items` array is
+  empty and the shop UI would render them blank. They still also open a WhatsApp message, since
+  that is how the owner actually watches for orders — the POST happens first, and if it fails the
+  WhatsApp tab does not open.
 - **OTP delivery degrades silently.** `sendOtpSms` sends an IPPanel pattern message when the SMS
   env vars are set; when they are not, it prints the code to the server console and returns `false`
   instead of failing the request. In a sandbox the server log is the only place to read the code.
@@ -268,7 +273,7 @@ curl -I http://127.0.0.1:3200/        # باید ۲۰۰ بدهد
 
 ## Suggested next steps
 
-- Persist salad-bar orders into the `Order` collection so they show up in `/admin`.
+- Show salad orders in the customer's own order history too (they are filtered out of it today).
 - Rotate the IPPanel key and empty out `.env.example`.
 - Replace the procedural salad ingredient art with real photographs once the shop provides them
   (`lib/salad-art.ts` already has an image slot for this).

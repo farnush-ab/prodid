@@ -1,6 +1,8 @@
 import { Schema, model, models, type Model, type Types } from "mongoose";
 import type { DeliveryDay, DeliverySlot, OrderStatus, PayMethod, PayStatus } from "@/lib/order";
 import type { OrderCoupon } from "@/lib/coupon";
+import type { SaladOrderLine } from "@/lib/salad-order";
+import type { SaladWay } from "@/lib/salad";
 
 export interface OrderItemDoc {
   productId: string;
@@ -28,6 +30,13 @@ export interface OrderDoc {
   deliveryFee: number | null;
   hasWeightItems: boolean;
   coupon: OrderCoupon | null;
+  /* سفارش سالاد بار در همین مجموعه ذخیره می‌شود: kind آن را از سفارش
+     فروشگاه جدا می‌کند و بقیه فیلدها فقط برای سالاد معنی دارند. */
+  kind: "shop" | "salad";
+  salads: SaladOrderLine[];
+  way: SaladWay | null;
+  saladSlot: string;
+  saladSlotLabel: string;
   // برای اتصال بعدی زرین‌پال
   zarinpalAuthority?: string;
   zarinpalRefId?: string;
@@ -74,6 +83,11 @@ const OrderSchema = new Schema<OrderDoc>(
     deliveryFee: { type: Number, default: null },
     hasWeightItems: { type: Boolean, default: false },
     coupon: { type: Schema.Types.Mixed, default: null },
+    kind: { type: String, enum: ["shop", "salad"], default: "shop", index: true },
+    salads: { type: Schema.Types.Mixed, default: [] },
+    way: { type: String, enum: ["pickup", "delivery", null], default: null },
+    saladSlot: { type: String, default: "" },
+    saladSlotLabel: { type: String, default: "" },
     zarinpalAuthority: { type: String, default: "", index: true },
     zarinpalRefId: { type: String, default: "" },
   },
