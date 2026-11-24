@@ -294,8 +294,7 @@ curl -I http://127.0.0.1:3200/        # باید ۲۰۰ بدهد
 
 - Show salad orders in the customer's own order history too (they are filtered out of it today).
 - Revoke and reissue the IPPanel API key — the old one is in git history (`.env.example` itself is clean now).
-- Two salad ingredients still use the procedural vector art because no photo was supplied:
-  `ton` (تن ماهی) and `loobia` (لوبیا چیتی). Drop a background-free `public/assets/img/salad/<id>.webp`
-  and add the id to `SALAD_PHOTO_IDS` in `lib/salad.ts`. `cranberry.webp` is already there for a future
-  «کرن‌بری» ingredient.
+- Every seeded salad ingredient now has a photo. For a new one: drop a background-free
+  `public/assets/img/salad/<id>.webp` and add the id to `SALAD_PHOTO_IDS` in `lib/salad.ts` (or just
+  upload a photo from the admin). `cranberry.webp` is already there for a future «کرن‌بری» ingredient.
 - Refresh `CLAUDE.md` so the admin-API and catalog-source sections match reality.

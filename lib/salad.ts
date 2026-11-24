@@ -118,7 +118,7 @@ export const SALAD_DIETS = [
 const SALAD_PHOTO_IDS = new Set([
   "kahoo-pich", "kahoo-rasmi", "esfenaj", "kalam-banafsh", "quinoa",
   "khiar", "goje", "zorrat", "havij", "piaz", "felfel", "zeytoon", "ghaarch", "khiarshoor",
-  "morgh", "bacon", "tokhmemorgh", "jambon", "gusht",
+  "morgh", "bacon", "tokhmemorgh", "ton", "jambon", "gusht", "loobia",
   "parmezan", "feta", "mozarella",
   "crouton", "gerdoo", "badam", "konjed", "tokhme", "piaz-sookh", "anar",
 ]);
