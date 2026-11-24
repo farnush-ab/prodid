@@ -144,6 +144,7 @@ protected at the API, not the route.
 | `lib/salad.ts` / `lib/salad-art.ts` | Salad data + maths / the seeded-PRNG SVG drawing engine |
 | `lib/phone.ts` | Normalises Iranian numbers and Persian/Arabic digits to `09xxxxxxxxx` |
 | `lib/toast.tsx` | Imperative `toast()` + `<ToastHost/>` mounted once in the root layout |
+| `lib/variants.ts` | Product variants (e.g. «ظرف ۴۰۰ گرمی» / «ظرف ۵۰۰ گرمی»), each with its own price and stock. A cart/order line for a variant uses the key `productId~variantId`; `getLiveProduct(key)` returns a derived product (`lineProduct`) whose id is that key, name is «نام — گونه» and price/stock are the variant's, so cart and checkout code didn't change. The plain id of a product that has variants is **not** buyable. `/api/catalog` sends `storefrontProduct()` (price = cheapest available variant, shown as «از …») |
 | `lib/wallet.ts` / `lib/wallet-server.ts` | Customer wallet. Balance lives on `User.walletBalance` and **only** changes through `creditWallet`/`debitWallet` (atomic `$inc`, debit conditional on balance) — each writes one `WalletTxn` ledger row. `dedupe` keys make refunds/top-ups/cashback idempotent |
 | `lib/insights.ts` / `lib/insights-server.ts` | Customer insights: per-customer buying pattern (products, weekday, gap, segment) and «late habit» alerts; store-wide overview; owner-approved win-back SMS + personal coupon (`sendNudge`) |
 | `lib/icons.tsx` | Every icon in the site. Add new ones here; a missing key renders nothing |
@@ -194,6 +195,7 @@ Notes that will save you an hour:
 | Change the seed for a brand-new database | `lib/data.ts` (`price: null` = «قیمت روی تماس», `available: false` = out of stock, `sale: "w"` = per-kg / `"u"` = per package) |
 | Add a storefront page | New folder under `app/(site)/`, `"use client"` page, plus a `layout.tsx` exporting only `metadata` if it needs a title |
 | Add it to the menu | **Two places.** `lib/nav.ts` feeds the desktop header and the footer; `components/BottomNav.tsx` has its own hardcoded list and is the *only* navigation on a phone, because `.main-nav` is `display: none` below 768px. A link added to `lib/nav.ts` alone is unreachable on mobile |
+| Sell one product in several sizes/packs | `/admin` → محصولات → ویرایش → «گونه‌ها»: one row per size with its own price and on/off. No new product needed. Order lines keep `productId` = the product, plus `variantId`/`variantLabel` |
 | Add an icon | `lib/icons.tsx` |
 | Add an admin tab | A view in `components/admin/`, the id in `AdminView`+nav in `components/admin/AdminShell.tsx`, the section in `lib/roles.ts` (type, `ALL_SECTIONS`, `ROLE_SECTIONS`, `canMutate`), the data in `lib/admin-state.ts`, and the block in `app/admin/page.tsx` |
 | Add an admin section | A view in `components/admin/`, a tab in `app/admin/page.tsx`, a route under `app/api/admin/`, and the section name in `lib/roles.ts` |

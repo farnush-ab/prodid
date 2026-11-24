@@ -5,6 +5,7 @@ import { BRAND, CATEGORIES, PRODUCTS, type Category, type Product } from "@/lib/
 import { INTRO_MSG, PEEK_MSG, RECIPES, type RecipeTip } from "@/lib/assistant-content";
 import { SEED_SALAD_CATALOG, type SaladCatalog } from "@/lib/salad";
 import { DELIVERY_DAYS, DELIVERY_SLOTS } from "@/lib/order";
+import { resolveLine } from "@/lib/variants";
 import type { BrandInfo, DeliveryToggle, DeliveryZone, StoreFeatures } from "@/lib/store-settings";
 
 export interface PublicCatalog {
@@ -70,9 +71,10 @@ export function subscribeCatalog(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
+/** شناسهٔ محصول، یا کلید ردیف گونه (`محصول~گونه`) که ردیف مشتق را برمی‌گرداند */
 export function getLiveProduct(id: string | null | undefined): Product | undefined {
   if (!id) return undefined;
-  return snapshot.products.find((p) => p.id === id);
+  return resolveLine(snapshot.products, id);
 }
 
 export function getLiveCategory(id: string | null | undefined): Category | undefined {

@@ -6,6 +6,8 @@ import type { SaladWay } from "@/lib/salad";
 
 export interface OrderItemDoc {
   productId: string;
+  variantId?: string;
+  variantLabel?: string;
   name: string;
   sale: "w" | "u";
   qty: number;
@@ -59,6 +61,8 @@ export interface OrderDoc {
 const OrderItemSchema = new Schema<OrderItemDoc>(
   {
     productId: { type: String, required: true },
+    variantId: { type: String },
+    variantLabel: { type: String },
     name: { type: String, required: true },
     sale: { type: String, enum: ["w", "u"], required: true },
     qty: { type: Number, required: true },

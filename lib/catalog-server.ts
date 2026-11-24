@@ -29,6 +29,7 @@ export function toProduct(doc: {
   desc: string;
   badge: string;
   available: boolean;
+  variants?: { id: string; label: string; price: number | null; available: boolean }[] | null;
 }): Product {
   const fromArr = (doc.images || []).map((s) => String(s || "").trim()).filter(Boolean);
   const single = (doc.image || "").trim();
@@ -45,6 +46,12 @@ export function toProduct(doc: {
     desc: doc.desc,
     badge: doc.badge,
     available: doc.available,
+    variants: (doc.variants || []).map((v) => ({
+      id: String(v.id),
+      label: String(v.label),
+      price: v.price ?? null,
+      available: v.available !== false,
+    })),
   };
 }
 

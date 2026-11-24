@@ -48,7 +48,7 @@ type RawOrder = {
   kind?: string;
   status: string;
   customer: { name: string; phone: string };
-  items: { productId: string; name: string; qty: number; sale: "w" | "u"; lineTotal: number }[];
+  items: { productId: string; name: string; variantLabel?: string; qty: number; sale: "w" | "u"; lineTotal: number }[];
   salads?: { price?: number }[];
   estimatedTotal: number;
   finalTotal: number | null;
@@ -60,7 +60,14 @@ function toInsightOrder(o: RawOrder): InsightOrder {
   const payable = isSalad ? o.estimatedTotal : orderPayable({ estimatedTotal: o.estimatedTotal, finalTotal: o.finalTotal, coupon: o.coupon });
   const items = isSalad
     ? [{ productId: SALAD_ID, name: "سالاد سفارشی", qty: (o.salads || []).length || 1, sale: "u" as const, lineTotal: o.estimatedTotal }]
-    : (o.items || []).map((it) => ({ productId: it.productId, name: it.name, qty: it.qty, sale: it.sale, lineTotal: it.lineTotal }));
+    : (o.items || []).map((it) => ({
+        productId: it.productId,
+        // گونه‌ها زیر همان محصول جمع می‌شوند (عادت «سبزیجات یخ‌زده»، نه «… — ظرف ۴۰۰ گرمی»)
+        name: it.variantLabel ? it.name.replace(` — ${it.variantLabel}`, "") : it.name,
+        qty: it.qty,
+        sale: it.sale,
+        lineTotal: it.lineTotal,
+      }));
   return {
     orderNo: o.orderNo,
     createdAt: new Date(o.createdAt).toISOString(),

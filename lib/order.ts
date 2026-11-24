@@ -66,7 +66,11 @@ export const PAY_STATUS_LABEL: Record<PayStatus, string> = {
 };
 
 export interface PublicOrderItem {
+  /** همیشه شناسهٔ محصول اصلی (برای گزارش‌ها)، حتی برای گونه */
   productId: string;
+  /** گونهٔ انتخاب‌شده، اگر محصول گونه‌دار بوده؛ نام ردیف هم «نام — گونه» است */
+  variantId?: string;
+  variantLabel?: string;
   name: string;
   sale: "w" | "u";
   qty: number;

@@ -11,6 +11,7 @@ import { toast } from "@/lib/toast";
 import { useReveal, staggerDelay } from "@/components/Reveal";
 import { useCatalog } from "@/lib/catalog-store";
 import { productImageSrc } from "@/lib/product-image";
+import { hasVariants } from "@/lib/variants";
 
 function ProductImg({ p, cls = "p-img" }: { p: Product; cls?: string }) {
   const src = productImageSrc(p);
@@ -50,8 +51,10 @@ function SaleBadge({ p }: { p: Product }) {
 
 function PriceHTML({ p }: { p: Product }) {
   if (p.price === null) return <span className="p-price-call">استعلام قیمت</span>;
+  const prices = new Set((p.variants || []).map((v) => v.price));
   return (
     <>
+      {prices.size > 1 ? <span className="p-price-unit vr-from">از</span> : null}
       <span className="p-price">{fmtPrice(p.price)}</span>
       <span className="p-price-unit">{unitLabel(p)}</span>
     </>
@@ -123,6 +126,14 @@ function CardAction({ p }: { p: Product }) {
       <button className="p-add out" disabled title="ناموجود">
         <Icon name="close" />
       </button>
+    );
+  }
+  if (hasVariants(p)) {
+    // چند اندازه/گونه دارد: انتخاب در صفحهٔ محصول
+    return (
+      <Link className="p-add" href={`${pageHref("product")}?id=${p.id}`} title="انتخاب اندازه و افزودن" aria-label={`انتخاب گونهٔ ${p.name}`}>
+        <Icon name="plus" />
+      </Link>
     );
   }
   if (p.price === null) {

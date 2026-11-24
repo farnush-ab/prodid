@@ -6,6 +6,7 @@ import { normalizeProductImageFields } from "@/lib/product-image";
 import { Product } from "@/models/Product";
 import { Category } from "@/models/Category";
 import type { SaleType } from "@/lib/data";
+import { priceFromVariants, sanitizeVariants } from "@/lib/variants";
 
 export const runtime = "nodejs";
 
@@ -33,7 +34,8 @@ function parseProduct(body: Record<string, unknown>, isNew: boolean) {
         .slice(0, 48) || slugifyId(name, "p")
     : String(body.id || "");
   if (!/^[a-zA-Z0-9\u0600-\u06FF_-]+$/.test(id)) throw new Error("شناسه محصول نامعتبر است");
-  return { id, name, cat, sale: sale as SaleType, ic, image, images, desc, badge, available, price };
+  const variants = sanitizeVariants(body.variants);
+  return { id, name, cat, sale: sale as SaleType, ic, image, images, desc, badge, available, variants, price: priceFromVariants(variants, price) };
 }
 
 export async function POST(req: Request) {

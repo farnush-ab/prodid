@@ -12,6 +12,7 @@ import { toast } from "@/lib/toast";
 import { ProductCard } from "@/components/ProductCard";
 import { useCatalog } from "@/lib/catalog-store";
 import { productImagesSrc } from "@/lib/product-image";
+import { defaultVariant, hasVariants, lineProduct, splitKey } from "@/lib/variants";
 
 const WEIGHT_CHIPS = [250, 500, 1000];
 
@@ -183,15 +184,21 @@ function ProductAction({ p }: { p: Product }) {
 }
 
 function ProductContent() {
-  const id = useSearchParams()?.get("id");
+  /* id یا شناسهٔ محصول است، یا `محصول~گونه` (لینک ردیف سبد) که همان گونه را انتخاب می‌کند */
+  const { productId, variantId } = splitKey(useSearchParams()?.get("id") || "");
   const { products, categories, brand } = useCatalog();
-  const p = products.find((x) => x.id === id);
+  const base = products.find((x) => x.id === productId);
+  const [vid, setVid] = useState<string | null>(variantId);
+  useEffect(() => setVid(variantId), [variantId]);
+  const variant = base && hasVariants(base) ? base.variants!.find((x) => x.id === vid) || defaultVariant(base) : undefined;
+  /* p: ردیف قابل خرید (گونهٔ انتخاب‌شده یا خود محصول)؛ base: خود محصول برای عنوان و عکس */
+  const p = base && variant ? lineProduct(base, variant) : base;
 
   useEffect(() => {
-    if (p) document.title = `${p.name} | پرودید`;
-  }, [p]);
+    if (base) document.title = `${base.name} | پرودید`;
+  }, [base]);
 
-  if (!p) {
+  if (!p || !base) {
     return (
       <main className="container mt-2">
         <div className="empty-state">
@@ -210,16 +217,16 @@ function ProductContent() {
   }
 
   const cat = categories.find((c) => c.id === p.cat);
-  const related = products.filter((x) => x.cat === p.cat && x.id !== p.id).slice(0, 4);
+  const related = products.filter((x) => x.cat === base.cat && x.id !== base.id).slice(0, 4);
 
   return (
     <main className="container mt-2">
       <nav className="breadcrumb" aria-label="مسیر">
         <Link href={pageHref("index")}>خانه</Link> ‹ <Link href={pageHref("shop")}>فروشگاه</Link> ‹{" "}
-        <Link href={`${pageHref("shop")}?cat=${p.cat}`}>{cat?.name || p.cat}</Link> ‹ {p.name}
+        <Link href={`${pageHref("shop")}?cat=${p.cat}`}>{cat?.name || p.cat}</Link> ‹ {base.name}
       </nav>
       <div className="product-layout">
-        <ProductGallery p={p} />
+        <ProductGallery p={base} />
         <div className="product-info">
           <div className="p-meta">
             {p.badge ? <span className="badge badge-gold">{p.badge}</span> : null}
@@ -240,8 +247,29 @@ function ProductContent() {
               {cat?.name || p.cat}
             </span>
           </div>
-          <h1>{p.name}</h1>
+          <h1>{base.name}</h1>
           <p className="product-desc">{p.desc}</p>
+          {hasVariants(base) ? (
+            <div className="vr-picker" role="radiogroup" aria-label="انتخاب گونه">
+              <span className="vr-label">انتخاب کنید</span>
+              <div className="wchips vr-chips">
+                {base.variants!.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={variant?.id === v.id}
+                    disabled={!v.available}
+                    className={`wchip${variant?.id === v.id ? " active" : ""}${v.available ? "" : " vr-off"}`}
+                    onClick={() => setVid(v.id)}
+                  >
+                    <b>{v.label}</b>
+                    <span>{!v.available ? "ناموجود" : v.price === null ? "استعلامی" : `${fmtPrice(v.price)} تومان`}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="price-box">
             <div className="p-price-row">
               {p.price === null ? (
@@ -275,7 +303,7 @@ function ProductContent() {
               </div>
             ) : null}
           </div>
-          <ProductAction p={p} />
+          <ProductAction key={p.id} p={p} />
           <a className="btn btn-outline btn-block mt-2" href={`tel:${brand.phone}`}>
             <Icon name="headset" /> سوال دارید؟ تماس بگیرید
           </a>

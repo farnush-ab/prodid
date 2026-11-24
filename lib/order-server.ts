@@ -28,6 +28,7 @@ import { CouponError, recordCouponRedemption, releaseCouponForOrder, validateCou
 import { notifyOrderSms, notifyPaymentSms } from "@/lib/sms";
 import { orderDue } from "@/lib/order";
 import { walletShare } from "@/lib/wallet";
+import { hasVariants, lineProduct, splitKey } from "@/lib/variants";
 import { WalletError, creditWallet, debitWallet, ensureUserByPhone, getBalance } from "@/lib/wallet-server";
 import { AqayepardakhtError, aqayepardakhtCreate, aqayepardakhtVerify, isAqayepardakhtConfigured } from "@/lib/aqayepardakht";
 
@@ -61,6 +62,7 @@ export function toPublicOrder(doc: OrderDoc & { _id: Types.ObjectId }, opts?: { 
     },
     items: doc.items.map((it) => ({
       productId: it.productId,
+      ...(it.variantId ? { variantId: it.variantId, variantLabel: it.variantLabel || "" } : {}),
       name: it.name,
       sale: it.sale,
       qty: it.qty,
@@ -112,8 +114,19 @@ function buildItems(
     if (!id || seen.has(id)) throw new OrderError("سبد خرید نامعتبر است");
     seen.add(id);
 
-    const product = catalog.find((p) => p.id === id);
-    if (!product) throw new OrderError("یکی از محصولات دیگر موجود نیست");
+    /* id یا شناسهٔ محصول ساده است، یا `محصول~گونه` برای محصول گونه‌دار */
+    const { productId, variantId } = splitKey(id);
+    const base = catalog.find((p) => p.id === productId);
+    if (!base) throw new OrderError("یکی از محصولات دیگر موجود نیست");
+    let product = base;
+    if (hasVariants(base)) {
+      if (!variantId) throw new OrderError(`برای «${base.name}» یک گونه (مثلا اندازه) انتخاب کنید`);
+      const v = base.variants!.find((x) => x.id === variantId);
+      if (!v) throw new OrderError(`گونهٔ انتخاب‌شدهٔ «${base.name}» دیگر وجود ندارد؛ سبد را به‌روز کنید`);
+      product = lineProduct(base, v);
+    } else if (variantId) {
+      throw new OrderError(`«${base.name}» دیگر گونه ندارد؛ سبد را به‌روز کنید`);
+    }
     if (!product.available) throw new OrderError(`«${product.name}» ناموجود است`);
     if (product.price === null) throw new OrderError(`قیمت «${product.name}» نیاز به استعلام دارد`);
 
@@ -134,7 +147,8 @@ function buildItems(
 
     const lineTotal = Math.round(product.price * nextQty);
     items.push({
-      productId: product.id,
+      productId: base.id,
+      ...(product.variantLabel ? { variantId: variantId!, variantLabel: product.variantLabel } : {}),
       name: product.name,
       sale: product.sale,
       qty: nextQty,

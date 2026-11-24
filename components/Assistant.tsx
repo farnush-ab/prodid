@@ -10,6 +10,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { getCatalogSnapshot, getLiveProduct, type PublicCatalog } from "@/lib/catalog-store";
+import { defaultVariant, lineProduct } from "@/lib/variants";
 import type { Product } from "@/lib/data";
 import { fmtPrice, toFa, unitLabel } from "@/lib/format";
 import { iconHTML } from "@/lib/icons";
@@ -348,7 +349,13 @@ export function Assistant() {
       const addBtn = (e.target as HTMLElement).closest("[data-add]") as HTMLElement | null;
       if (!addBtn) return;
       e.preventDefault();
-      const p = getLiveProduct(addBtn.dataset.add);
+      let p = getLiveProduct(addBtn.dataset.add);
+      if (!p) {
+        // محصول گونه‌دار: گونهٔ پیش‌فرض اضافه می‌شود
+        const base = getCatalogSnapshot().products.find((x) => x.id === addBtn.dataset.add);
+        const v = base ? defaultVariant(base) : undefined;
+        if (base && v) p = lineProduct(base, v);
+      }
       if (!p) return;
       Cart.add(p.id);
       toast(`«${p.name}» به سبد اضافه شد`);
