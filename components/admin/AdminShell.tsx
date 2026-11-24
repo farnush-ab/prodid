@@ -21,7 +21,9 @@ export type AdminView =
   | "reports"
   | "coupons"
   | "salad"
-  | "salad-catalog";
+  | "salad-catalog"
+  | "wallet"
+  | "insights";
 
 interface NavItem {
   id: AdminView;
@@ -40,7 +42,8 @@ const NAV: NavGroup[] = [
     items: [
       { id: "orders", label: "سفارش‌ها", icon: "package" },
       { id: "salad", label: "سفارش سالاد", icon: "bowl" },
-      { id: "payments", label: "پرداخت‌ها", icon: "wallet" },
+      { id: "payments", label: "پرداخت‌ها", icon: "card" },
+      { id: "wallet", label: "کیف پول مشتریان", icon: "wallet" },
       { id: "coupons", label: "تخفیف‌ها", icon: "award" },
     ],
   },
@@ -56,6 +59,7 @@ const NAV: NavGroup[] = [
     label: "افراد",
     items: [
       { id: "customers", label: "مشتریان", icon: "users" },
+      { id: "insights", label: "شناخت مشتری", icon: "chart" },
       { id: "team", label: "تیم ادمین", icon: "shield" },
     ],
   },

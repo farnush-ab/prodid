@@ -30,14 +30,16 @@ export const PAY_METHODS = [
   {
     id: "online" as const,
     label: "پرداخت آنلاین",
-    hint: "با درگاه زرین‌پال؛ ورود با موبایل لازم است.",
+    hint: "با درگاه امن بانکی؛ ورود با موبایل لازم است.",
     icon: "card",
   },
 ];
 
 export type DeliveryDay = (typeof DELIVERY_DAYS)[number]["id"];
 export type DeliverySlot = (typeof DELIVERY_SLOTS)[number]["id"];
-export type PayMethod = (typeof PAY_METHODS)[number]["id"];
+/* "wallet" در فهرست انتخاب صفحه پرداخت نیست: وقتی موجودی کیف پول کل مبلغ را
+   بپوشاند سفارش خودکار با این روش ثبت می‌شود. */
+export type PayMethod = (typeof PAY_METHODS)[number]["id"] | "wallet";
 export type PayStatus = "unpaid" | "paid" | "failed";
 export type OrderStatus = "pending" | "confirmed" | "preparing" | "delivering" | "delivered" | "cancelled";
 
@@ -54,6 +56,7 @@ export const PAY_METHOD_LABEL: Record<PayMethod, string> = {
   card: "کارت به کارت",
   cod: "پرداخت در محل",
   online: "پرداخت آنلاین",
+  wallet: "کیف پول",
 };
 
 export const PAY_STATUS_LABEL: Record<PayStatus, string> = {
@@ -88,6 +91,14 @@ export interface PublicOrder {
   hasWeightItems: boolean;
   coupon?: OrderCoupon | null;
   zarinpalRefId?: string;
+  /** کد رهگیری بانکی پرداخت آنلاین */
+  payRef?: string;
+  /** مبلغی که از کیف پول کسر شده */
+  walletUsed?: number;
+  /** اعتبار هدیه‌ای که بعد از تحویل به کیف پول رفته */
+  cashback?: number;
+  /** مبلغی که پس از لغو به کیف پول برگشته */
+  refundedToWallet?: number;
   createdAt: string;
   viewToken?: string;
 }
@@ -102,6 +113,8 @@ export interface CreateOrderInput {
   pay: string;
   notes?: string;
   couponCode?: string;
+  /** موجودی کیف پول تا سقف مبلغ سفارش خرج شود (فقط برای کاربر واردشده) */
+  useWallet?: boolean;
 }
 
 export function dayLabel(id: string) {
@@ -121,7 +134,12 @@ export function isDeliverySlot(v: string): v is DeliverySlot {
 }
 
 export function isPayMethod(v: string): v is PayMethod {
-  return PAY_METHODS.some((p) => p.id === v);
+  return v === "wallet" || PAY_METHODS.some((p) => p.id === v);
+}
+
+/** آنچه بعد از کسر سهم کیف پول باید با روش اصلی پرداخت شود */
+export function orderDue(o: Pick<PublicOrder, "estimatedTotal" | "finalTotal" | "coupon" | "walletUsed">): number {
+  return Math.max(0, orderPayable(o) - Math.round(o.walletUsed || 0));
 }
 
 export function canPayOnlineOrder(o: Pick<PublicOrder, "paymentMethod" | "paymentStatus" | "status">) {
@@ -146,6 +164,8 @@ export function orderWhatsappText(order: PublicOrder, kind: "new" | "track" = "n
       ? `تخفیف ${faNum.format(order.coupon.percent)}٪ کد ${order.coupon.code}: −${fmtPrice(couponDiscountAmount(order.estimatedTotal, order.coupon.percent))} تومان`
       : "",
     order.coupon ? `قابل پرداخت: ${fmtPrice(orderPayable(order))} تومان` : "",
+    order.walletUsed ? `پرداخت از کیف پول: −${fmtPrice(order.walletUsed)} تومان` : "",
+    order.walletUsed ? `مانده: ${fmtPrice(orderDue(order))} تومان` : "",
     `گیرنده: ${order.customer.name}`,
     `موبایل: ${order.customer.phone}`,
     `آدرس: ${order.customer.address}`,

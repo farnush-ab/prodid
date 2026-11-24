@@ -3023,3 +3023,118 @@ body.sb-page .toast { bottom: calc(var(--bottomnav-h) + 78px); }
 .sbc-preset-price { display: block; margin-top: 5px; font-size: 0.86rem; font-weight: 800; color: var(--brand-orange-deep); }
 .sbc-preset-price i { font-style: normal; font-size: 0.68rem; font-weight: 500; color: var(--ink-2); margin-right: 6px; }
 .sbc-preset-acts { display: flex; flex-direction: column; gap: 6px; }
+
+/* =========================================================
+   کیف پول — حساب کاربری و تسویه حساب (پیشوند .wl-)
+   ========================================================= */
+@media (min-width: 560px) { .acc-stats { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1100px) { .acc-stats { grid-template-columns: repeat(4, 1fr); } }
+.wl-stat-link { font: inherit; text-align: inherit; cursor: pointer; width: 100%; transition: border-color 0.2s var(--ease); }
+.wl-stat-link:hover { border-color: var(--wine-border); }
+
+.wl-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--espresso-800);
+  color: #efe7d8;
+}
+.wl-balance-label { display: block; font-size: 0.8rem; color: rgba(239, 231, 216, 0.7); margin-bottom: 6px; }
+.wl-balance-value { display: block; font-size: 1.9rem; font-weight: 900; line-height: 1.2; color: #fff; font-variant-numeric: tabular-nums; }
+.wl-balance-value small { font-size: 0.8rem; font-weight: 700; margin-inline-start: 6px; color: rgba(239, 231, 216, 0.7); }
+.wl-balance-hint { display: block; margin-top: 10px; font-size: 0.78rem; line-height: 1.9; color: rgba(239, 231, 216, 0.65); max-width: 52ch; }
+.wl-balance-ico {
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--brand-orange-light);
+}
+.wl-balance-ico .ico { width: 28px; height: 28px; }
+@media (max-width: 480px) { .wl-balance-ico { display: none; } }
+
+.wl-perk {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  background: var(--brand-green-tint);
+  color: var(--brand-green-deep);
+  font-size: 0.82rem;
+  line-height: 1.9;
+}
+.wl-perk .ico { width: 18px; height: 18px; flex-shrink: 0; margin-top: 3px; }
+
+.wl-presets { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 640px) { .wl-presets { grid-template-columns: repeat(4, 1fr); } }
+
+.wl-txns { list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; }
+.wl-txn { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.wl-txn:last-child { border-bottom: none; }
+.wl-txn-ico { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; }
+.wl-txn-ico .ico { width: 16px; height: 16px; }
+.wl-txn-ico.in { background: var(--brand-green-tint); color: var(--brand-green-deep); }
+.wl-txn-ico.out { background: var(--wine-tint); color: var(--wine); }
+.wl-txn-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.wl-txn-main b { font-size: 0.86rem; color: var(--espresso-800); }
+.wl-txn-main span { font-size: 0.74rem; color: var(--ink-2); }
+.wl-txn-amt { flex-shrink: 0; text-align: left; display: flex; flex-direction: column; gap: 3px; }
+.wl-txn-amt b { font-size: 0.92rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.wl-txn-amt b.in { color: var(--brand-green-deep); }
+.wl-txn-amt b.out { color: var(--wine); }
+.wl-txn-amt span { font-size: 0.7rem; color: var(--ink-2); }
+
+.wl-pay-option b .ico { color: var(--brand-green-deep); }
+
+/* =========================================================
+   پنل مدیریت: پروندهٔ مشتری، شناخت مشتری، کیف پول (پیشوند .adm-ins-)
+   ========================================================= */
+.adm-ins-back { margin-bottom: 8px; padding-inline: 0; }
+.adm-ins-back .ico { transform: scaleX(-1); }
+.adm-page-head h1 .adm-pill { font-size: 0.72rem; }
+
+.adm-ins-alerts { margin-bottom: 16px; border-color: var(--wine-border); }
+.adm-ins-alert { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--line); font-size: 0.84rem; color: var(--espresso-800); }
+.adm-ins-alert:last-child { border-bottom: none; }
+.adm-ins-alert .grow { flex: 1; min-width: 0; line-height: 1.9; }
+.adm-ins-alert-ico { flex-shrink: 0; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--brand-orange-tint); color: var(--brand-orange-deep); }
+.adm-ins-alert-ico .ico { width: 16px; height: 16px; }
+
+.adm-ins-prod { align-items: flex-start; }
+.adm-ins-prod .lbl { padding-top: 2px; }
+.adm-ins-bar-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.adm-ins-bar-col .adm-cell-sub { font-size: 0.68rem; }
+/* داخل ستون، flex: 1 ارتفاع را صفر می‌کند؛ این‌جا نوار عرض کامل و ارتفاع ثابت دارد */
+.adm-ins-bar-col .adm-bar-track { flex: none; width: 100%; }
+.adm-ins-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.adm-ins-stack { display: flex; overflow: hidden; min-width: 8px; }
+.adm-ins-stack .adm-bar-fill { border-radius: 0; }
+.adm-ins-months { display: grid; grid-template-columns: repeat(12, 1fr); padding: 6px 18px 14px; font-size: 0.62rem; color: var(--ink-2); text-align: center; }
+.adm-ins-scroll { max-height: 360px; overflow-y: auto; }
+.adm-ins-reason { font-size: 0.78rem; line-height: 1.9; min-width: 220px; color: var(--espresso-800); }
+.adm-ins-link { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: right; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.adm-ins-link:hover .adm-cell-main, .adm-ins-link:hover b { color: var(--wine); }
+.adm-ins-preview { background: var(--brand-green-tint); border-radius: var(--radius); padding: 12px 14px; }
+.adm-ins-preview p { margin-top: 6px; font-size: 0.82rem; line-height: 1.9; color: var(--espresso-800); }
+.adm-card-head .adm-chips { justify-content: flex-end; }
+@media (max-width: 640px) {
+  .adm-card-head:has(.adm-chips) { flex-direction: column; align-items: stretch; }
+  .adm-card-head .adm-chips { justify-content: flex-start; }
+}
+/* README «Never touch» #6: ستون‌های گرید باید min-width: 0 داشته باشند، وگرنه جدول
+   پهن یا عدد بلند کل ستون را از عرض صفحه بیرون می‌زند (روی موبایل اسکرول افقی). */
+.adm-stat-grid > *, .adm-grid-2 > *, .adm-grid-2-even > * { min-width: 0; }
+@media (max-width: 480px) {
+  .adm-metric .m-value { font-size: 1rem; }
+  .adm-metric .m-value small { display: block; margin: 2px 0 0; }
+}
+.adm-ins-legend .adm-swatch { display: inline-block; vertical-align: middle; margin-inline-end: 4px; }

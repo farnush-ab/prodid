@@ -3,6 +3,7 @@ import { adminErrorResponse, requireCan, requireStaff } from "@/lib/admin-auth";
 import { adminPatchOrder } from "@/lib/admin-orders";
 import { toAdminOrder } from "@/lib/admin-format";
 import { OrderError } from "@/lib/order-server";
+import { WalletError } from "@/lib/wallet-server";
 import type { OrderStatus, PayStatus } from "@/lib/order";
 
 export const runtime = "nodejs";
@@ -11,7 +12,7 @@ export async function PATCH(req: Request, { params }: { params: { no: string } }
   try {
     const user = await requireStaff();
     let body: {
-      action?: "advance" | "cancel" | "markPaid";
+      action?: "advance" | "cancel" | "markPaid" | "refundToWallet";
       status?: OrderStatus;
       paymentStatus?: PayStatus;
       finalTotal?: number | null;
@@ -25,12 +26,13 @@ export async function PATCH(req: Request, { params }: { params: { no: string } }
 
     if (body.action === "cancel") requireCan(user, "orders.cancel");
     else if (body.action === "markPaid") requireCan(user, "payments");
+    else if (body.action === "refundToWallet") requireCan(user, "wallet");
     else requireCan(user, "orders");
 
-    const order = await adminPatchOrder(params.no, body);
+    const order = await adminPatchOrder(params.no, body, user.phone);
     return NextResponse.json({ order: toAdminOrder(order) });
   } catch (err) {
-    if (err instanceof OrderError) {
+    if (err instanceof OrderError || err instanceof WalletError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     return adminErrorResponse(err);

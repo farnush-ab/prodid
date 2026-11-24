@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthSession } from "@/lib/session";
 import { OrderError, startOnlinePaymentForExistingOrder, startOnlinePaymentForNewOrder } from "@/lib/order-server";
 import { ZarinpalError } from "@/lib/zarinpal";
+import { AqayepardakhtError } from "@/lib/aqayepardakht";
 import type { CreateOrderInput } from "@/lib/order";
 
 export const runtime = "nodejs";
@@ -44,13 +45,15 @@ export async function POST(req: Request) {
             slot: body?.slot || "",
             pay: "online",
             notes: body?.notes,
+            couponCode: body?.couponCode,
+            useWallet: Boolean(body?.useWallet),
           },
           user,
           appUrl
         );
     return NextResponse.json(result);
   } catch (err) {
-    if (err instanceof OrderError || err instanceof ZarinpalError) {
+    if (err instanceof OrderError || err instanceof ZarinpalError || err instanceof AqayepardakhtError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     console.error(err);

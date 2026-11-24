@@ -15,7 +15,11 @@ export type SmsPattern =
   | "couponPublic"
   | "couponLoyalty"
   | "birthday"
-  | "restock";
+  | "restock"
+  | "walletCredit"
+  | "walletDebit"
+  | "winback"
+  | "reminder";
 
 const PATTERN_ENV: Record<SmsPattern, string> = {
   otp: "IPPANEL_PATTERN_OTP",
@@ -31,7 +35,16 @@ const PATTERN_ENV: Record<SmsPattern, string> = {
   couponLoyalty: "IPPANEL_PATTERN_COUPON_LOYALTY",
   birthday: "IPPANEL_PATTERN_BIRTHDAY",
   restock: "IPPANEL_PATTERN_RESTOCK",
+  walletCredit: "IPPANEL_PATTERN_WALLET_CREDIT",
+  walletDebit: "IPPANEL_PATTERN_WALLET_DEBIT",
+  winback: "IPPANEL_PATTERN_WINBACK",
+  reminder: "IPPANEL_PATTERN_REMINDER",
 };
+
+/** آیا پترن این پیامک روی سرور تنظیم شده — برای اینکه پنل قبل از ارسال بگوید */
+export function isPatternReady(id: SmsPattern) {
+  return isIppanelConfigured() && Boolean(patternCode(id));
+}
 
 const ORDER_STATUS_PATTERN: Record<string, SmsPattern> = {
   pending: "orderPending",
@@ -157,4 +170,59 @@ export function notifyRestockSms(opts: { phone: string; name: string; productNam
       name: opts.name,
     })
   );
+}
+
+export function notifyWalletSms(opts: {
+  phone: string;
+  name: string;
+  amount: number;
+  balance: number;
+  reason: string;
+  credit: boolean;
+}) {
+  fire(`wallet ${opts.credit ? "+" : "-"}${opts.amount} → ${opts.phone}`, () =>
+    sendPatternSms(opts.credit ? "walletCredit" : "walletDebit", opts.phone, {
+      "user.name": opts.name,
+      name: opts.name,
+      amount: fmtPrice(opts.amount),
+      balance: fmtPrice(opts.balance),
+      reason: opts.reason,
+    })
+  );
+}
+
+/**
+ * پیامک بازگشت مشتری (کد تخفیف شخصی) یا یادآوری ساده. برخلاف بقیه
+ * منتظر می‌ماند و نتیجه را برمی‌گرداند، چون مدیر در پنل دکمه را زده و
+ * باید بداند پیام رفته یا نه.
+ */
+export async function sendCustomerNudgeSms(opts: {
+  kind: "winback" | "reminder";
+  phone: string;
+  name: string;
+  productName: string;
+  days: number;
+  code?: string;
+  percent?: number;
+  expiresAt?: string;
+}): Promise<{ sent: boolean; reason?: string }> {
+  if (!isIppanelConfigured()) return { sent: false, reason: "پنل پیامک روی سرور تنظیم نشده است" };
+  if (!patternCode(opts.kind)) {
+    return { sent: false, reason: `پترن ${opts.kind === "winback" ? "کد تخفیف بازگشت" : "یادآوری"} (${PATTERN_ENV[opts.kind]}) تنظیم نشده است` };
+  }
+  try {
+    await sendPatternSms(opts.kind, opts.phone, {
+      "user.name": opts.name,
+      name: opts.name,
+      "product.name": opts.productName,
+      product: opts.productName,
+      days: toFa(opts.days),
+      code: opts.code || "",
+      percent: opts.percent ? toFa(opts.percent) : "",
+      expiresAt: opts.expiresAt || "",
+    });
+    return { sent: true };
+  } catch (err) {
+    return { sent: false, reason: err instanceof Error ? err.message : "ارسال پیامک انجام نشد" };
+  }
 }

@@ -9,7 +9,8 @@ function axisLabel(v: number) {
   return `${faNum.format(Math.round(v / 1000))} هزار`;
 }
 
-export function RevenueChart({ data, height = 220 }: { data: number[]; height?: number }) {
+/* labels: برچسب هر نقطه در راهنما (مثلا نام ماه). نیامده = «n روز پیش» مثل قبل */
+export function RevenueChart({ data, height = 220, labels }: { data: number[]; height?: number; labels?: string[] }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<{ i: number; x: number; y: number } | null>(null);
 
@@ -77,7 +78,7 @@ export function RevenueChart({ data, height = 220 }: { data: number[]; height?: 
 
       {hover ? (
         <div className="adm-chart-tip show" style={{ left: hover.x, top: hover.y - 38 }}>
-          {data.length - 1 - hover.i === 0 ? "امروز" : `${faNum.format(data.length - 1 - hover.i)} روز پیش`} · {fmtPrice(data[hover.i])} تومان
+          {labels?.[hover.i] ?? (data.length - 1 - hover.i === 0 ? "امروز" : `${faNum.format(data.length - 1 - hover.i)} روز پیش`)} · {fmtPrice(data[hover.i])} تومان
         </div>
       ) : null}
     </div>

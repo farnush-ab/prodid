@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthSession } from "@/lib/session";
 import { dbConnect } from "@/lib/mongodb";
 import { User, type UserDoc } from "@/models/User";
-import { canMutate, isStaffRole, type StaffRole } from "@/lib/roles";
+import { canAccessSection, canMutate, isStaffRole, type AdminSection, type StaffRole } from "@/lib/roles";
 import { ensureSeeded } from "@/lib/seed";
 
 export class AdminError extends Error {
@@ -37,9 +37,22 @@ export function requireCan(user: StaffUser, action: Parameters<typeof canMutate>
   }
 }
 
+/** دیدن یک بخش (نه تغییر دادن آن) */
+export function requireSection(user: StaffUser, ...sections: AdminSection[]) {
+  if (!sections.some((s) => canAccessSection(user.role, s))) {
+    throw new AdminError("به این بخش دسترسی ندارید", 403);
+  }
+}
+
 export function adminErrorResponse(err: unknown) {
   if (err instanceof AdminError) {
     return NextResponse.json({ error: err.message }, { status: err.status });
+  }
+  /* خطاهای دامنه‌ای (WalletError، InsightError، OrderError، CouponError…) همه
+     پیام فارسی و یک status عددی دارند؛ همان را به پنل برمی‌گردانیم. */
+  const status = (err as { status?: unknown })?.status;
+  if (err instanceof Error && typeof status === "number" && status >= 400 && status < 600) {
+    return NextResponse.json({ error: err.message }, { status });
   }
   console.error(err);
   return NextResponse.json({ error: "خطای داخلی سرور" }, { status: 500 });

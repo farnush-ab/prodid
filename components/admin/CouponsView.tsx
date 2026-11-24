@@ -125,6 +125,7 @@ export function CouponsView({
             <option value="public">{COUPON_KIND_LABEL.public}</option>
             <option value="loyalty">{COUPON_KIND_LABEL.loyalty}</option>
             <option value="birthday">{COUPON_KIND_LABEL.birthday}</option>
+            <option value="personal">{COUPON_KIND_LABEL.personal}</option>
           </select>
         </div>
         <div className="adm-table-wrap">
@@ -196,11 +197,15 @@ export function CouponsView({
               </div>
               <div>
                 <label htmlFor="cp-kind">نوع</label>
-                <select id="cp-kind" value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as CouponKind })}>
-                  <option value="public">{COUPON_KIND_LABEL.public}</option>
-                  <option value="loyalty">{COUPON_KIND_LABEL.loyalty}</option>
-                  <option value="birthday">{COUPON_KIND_LABEL.birthday}</option>
-                </select>
+                {draft.kind === "personal" ? (
+                  <input id="cp-kind" value={`${COUPON_KIND_LABEL.personal}${editing !== "new" && editing.phone ? ` — ${editing.phone}` : ""}`} disabled />
+                ) : (
+                  <select id="cp-kind" value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as CouponKind })}>
+                    <option value="public">{COUPON_KIND_LABEL.public}</option>
+                    <option value="loyalty">{COUPON_KIND_LABEL.loyalty}</option>
+                    <option value="birthday">{COUPON_KIND_LABEL.birthday}</option>
+                  </select>
+                )}
               </div>
             </div>
             {draft.kind === "loyalty" ? (

@@ -40,6 +40,18 @@ export interface OrderDoc {
   // برای اتصال بعدی زرین‌پال
   zarinpalAuthority?: string;
   zarinpalRefId?: string;
+  /** درگاهی که پرداخت آنلاین این سفارش با آن شروع شده */
+  gateway?: "" | "zarinpal" | "aqayepardakht";
+  /** شناسهٔ تراکنش آقای پرداخت (transid) */
+  gatewayTransId?: string;
+  /** کد رهگیری بانک برای پرداخت آنلاین (هر درگاهی) */
+  payRef?: string;
+  /** مبلغی که از کیف پول برای این سفارش کسر شده (تومان) */
+  walletUsed: number;
+  /** اعتبار هدیه‌ای که بعد از تحویل به کیف پول رفته */
+  cashback: number;
+  /** مبلغی که از پرداخت آنلاینِ سفارش لغوشده به کیف پول برگشته */
+  refundedToWallet: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,7 +82,7 @@ const OrderSchema = new Schema<OrderDoc>(
     notes: { type: String, default: "" },
     day: { type: String, enum: ["today", "tomorrow"], required: true },
     slot: { type: String, enum: ["9-12", "12-15", "15-18", "18-21"], required: true },
-    paymentMethod: { type: String, enum: ["card", "cod", "online"], required: true },
+    paymentMethod: { type: String, enum: ["card", "cod", "online", "wallet"], required: true },
     paymentStatus: { type: String, enum: ["unpaid", "paid", "failed"], default: "unpaid" },
     status: {
       type: String,
@@ -90,6 +102,12 @@ const OrderSchema = new Schema<OrderDoc>(
     saladSlotLabel: { type: String, default: "" },
     zarinpalAuthority: { type: String, default: "", index: true },
     zarinpalRefId: { type: String, default: "" },
+    gateway: { type: String, default: "" },
+    gatewayTransId: { type: String, default: "", index: true },
+    payRef: { type: String, default: "" },
+    walletUsed: { type: Number, default: 0 },
+    cashback: { type: Number, default: 0 },
+    refundedToWallet: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

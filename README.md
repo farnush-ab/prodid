@@ -24,7 +24,7 @@ test suite, so a typecheck, a build and a real browser pass are the only safety 
 | Database | MongoDB via Mongoose 9 (`models/*.ts`) |
 | Auth | NextAuth 4 — a single `phone-otp` Credentials provider, JWT sessions, 30-day maxAge |
 | SMS | IPPanel pattern messages (`lib/ippanel.ts`, `lib/sms.ts`) |
-| Payment | ZarinPal (`lib/zarinpal.ts`, `app/api/payments/zarinpal/*`) |
+| Payment | آقای پرداخت (`lib/aqayepardakht.ts`) — primary, used for wallet top-up and online orders. ZarinPal (`lib/zarinpal.ts`) is the fallback when `AQAYEPARDAKHT_PIN` is unset |
 | Order handoff | WhatsApp `wa.me` deep links (`lib/order.ts`) — still how the owner actually receives orders |
 | Icons & art | Inline SVG only (`lib/icons.tsx`, `lib/salad-art.ts`). No icon package |
 | Runtime | Docker (`Dockerfile` + `docker-compose.yml`) on the owner's own server |
@@ -118,10 +118,14 @@ api/catalog                 public catalog + settings snapshot for the browser
 api/me                      read/patch the logged-in user's profile
 api/orders, orders/[no]     create / list-mine / fetch one (guest access via viewToken)
 api/coupons                 list the offers available to the caller / preview a coupon code
-api/payments/zarinpal/*     request + callback
+api/payments/zarinpal/request   start an online payment (name is historical: it uses whichever gateway is active)
+api/payments/zarinpal/callback  ZarinPal return
+api/payments/aqayepardakht/callback  آقای پرداخت return (POST form) — W… invoice = wallet top-up, PD… = order
+api/wallet, wallet/topup    the logged-in customer's wallet summary / start a top-up
 api/media/products/[file]   serves uploaded images out of the uploads/ volume
 api/admin/*                 state, orders, products, categories, coupons, customers, team,
-                            settings, and the two image-upload endpoints
+                            settings, the image-upload endpoints, wallet (+ topups/[id] re-verify),
+                            insights, customers/[phone]/{wallet,insights,nudge}
 ```
 
 Every `api/admin/*` route calls `requireStaff()` and then `requireCan(user, "<section>")`.
@@ -140,6 +144,8 @@ protected at the API, not the route.
 | `lib/salad.ts` / `lib/salad-art.ts` | Salad data + maths / the seeded-PRNG SVG drawing engine |
 | `lib/phone.ts` | Normalises Iranian numbers and Persian/Arabic digits to `09xxxxxxxxx` |
 | `lib/toast.tsx` | Imperative `toast()` + `<ToastHost/>` mounted once in the root layout |
+| `lib/wallet.ts` / `lib/wallet-server.ts` | Customer wallet. Balance lives on `User.walletBalance` and **only** changes through `creditWallet`/`debitWallet` (atomic `$inc`, debit conditional on balance) — each writes one `WalletTxn` ledger row. `dedupe` keys make refunds/top-ups/cashback idempotent |
+| `lib/insights.ts` / `lib/insights-server.ts` | Customer insights: per-customer buying pattern (products, weekday, gap, segment) and «late habit» alerts; store-wide overview; owner-approved win-back SMS + personal coupon (`sendNudge`) |
 | `lib/icons.tsx` | Every icon in the site. Add new ones here; a missing key renders nothing |
 
 ## Run it
@@ -244,6 +250,35 @@ find, because it shows up as a blank render, a hydration crash or a phone-only v
     the served path without migrating the stored values (`lib/category-image.ts` / `lib/product-image.ts` do that translation).
 12. **Do not delete the client-side localStorage layer** because the backend exists. Guest checkout
     and the cart still depend on it.
+
+## Wallet (کیف پول) — how money moves
+
+- **Top-up:** `/account` → «کیف پول» → آقای پرداخت → callback verifies → `creditWallet(type: "topup", dedupe: topup:<invoice>)`.
+  A top-up whose return was lost shows as «ناموفق»/«در انتظار» in admin → «کیف پول مشتریان» → «بررسی دوباره»
+  asks the gateway directly and credits it if the money arrived.
+- **Paying:** checkout has a «پرداخت از کیف پول» option (on by default when there is a balance). The wallet pays up
+  to the payable amount; if it covers everything the order is `paymentMethod: "wallet"`, already paid; otherwise the
+  rest (`orderDue()`) goes through the chosen method. `Order.walletUsed` records the wallet share.
+- **Cancel:** the wallet share always comes back automatically. Money paid outside the wallet (online/card) comes back
+  automatically when the *customer* cancels; when *staff* cancel, there is an explicit «برگشت مبلغ به کیف پول» button.
+- **Weighed items:** when staff save a final total, excess wallet share is refunded; if a wallet-paid order got more
+  expensive, the difference is taken from the wallet if possible, otherwise it is collected on delivery.
+- **Cashback:** optional %, credited when an order becomes «تحویل شده» (settings in the wallet tab; 0 = off).
+- **Manual credit/debit:** customer profile → «افزایش/کسر موجودی», a reason is mandatory and is logged with the
+  staff phone. Only `owner` and `orders` roles can move money; `support` can only look.
+- The customer profile shows a ledger check: if stored balance ≠ sum of the ledger it says so.
+
+## Customer insights (شناخت مشتری)
+
+- Admin → «شناخت مشتری»: queue of customers behind their usual rhythm, segments, weekday/month charts, products
+  that bring people back, top customers, and how many messaged customers bought again within 30 days.
+- Admin → «مشتریان» → a customer: full profile with the same charts for that one person, alerts like
+  «معمولاً هر ۷ روز جوجه زعفرانی می‌خرید، بیشتر پنجشنبه‌ها — ۵ هفته است نخریده», wallet, orders and message history.
+- Nothing is sent automatically. «پیام» creates a one-time personal coupon (kind `personal`, valid only for that
+  phone) and sends `IPPANEL_PATTERN_WINBACK`, or sends `IPPANEL_PATTERN_REMINDER`, or just logs a phone call. After a
+  message the customer rests for `cooldownDays` before showing up as «آمادهٔ پیام» again.
+- Detection rules are editable in the same tab. Pure maths lives in `lib/insights.ts` and can be unit-tested without
+  a database.
 
 ## Known gaps — do not mistake these for bugs
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { fmtPrice, faNum, qtyLabelBySale } from "@/lib/format";
-import { ORDER_STATUS_LABEL, PAY_METHOD_LABEL, dayLabel, slotLabel, orderWhatsappUrl, type OrderStatus } from "@/lib/order";
+import { ORDER_STATUS_LABEL, PAY_METHOD_LABEL, dayLabel, orderDue, slotLabel, orderWhatsappUrl, type OrderStatus } from "@/lib/order";
 import { couponDiscountAmount, orderPayable, orderSubtotal } from "@/lib/coupon";
 import type { AdminOrder } from "@/lib/admin-data";
 import { AppModal } from "@/components/AppModal";
@@ -47,6 +47,7 @@ export function OrdersView({
   onCancel,
   onMarkPaid,
   onSaveTotals,
+  onRefundToWallet,
 }: {
   orders: AdminOrder[];
   statusFilter: OrderStatus | "all";
@@ -55,6 +56,8 @@ export function OrdersView({
   onCancel: (orderNo: string) => void;
   onMarkPaid: (orderNo: string) => void;
   onSaveTotals?: (orderNo: string, finalTotal: number | null, deliveryFee: number | null) => void;
+  /** فقط برای نقش‌هایی که اجازهٔ جابه‌جایی پول دارند */
+  onRefundToWallet?: (orderNo: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [openOrderNo, setOpenOrderNo] = useState<string | null>(null);
@@ -229,6 +232,29 @@ export function OrdersView({
               <b>قابل پرداخت</b>
               <b className="amount">{fmtPrice(orderPayable(openOrder))} تومان</b>
             </div>
+            {openOrder.walletUsed ? (
+              <>
+                <div className="adm-item-line">
+                  <span>پرداخت‌شده از کیف پول</span>
+                  <span className="amount">−{fmtPrice(openOrder.walletUsed)} تومان</span>
+                </div>
+                <div className="adm-item-line">
+                  <b>مانده برای دریافت</b>
+                  <b className="amount">{fmtPrice(openOrder.paymentStatus === "paid" ? 0 : orderDue(openOrder))} تومان</b>
+                </div>
+              </>
+            ) : null}
+            {openOrder.cashback ? (
+              <div className="adm-item-line">
+                <span>اعتبار هدیه به کیف پول</span>
+                <span className="amount">{fmtPrice(openOrder.cashback)} تومان</span>
+              </div>
+            ) : null}
+            {openOrder.status === "cancelled" && (openOrder.walletUsed || openOrder.refundedToWallet) ? (
+              <p className="hint" style={{ marginTop: 8 }}>
+                {fmtPrice((openOrder.walletUsed || 0) + (openOrder.refundedToWallet || 0))} تومان به کیف پول مشتری برگشته است.
+              </p>
+            ) : null}
             {openOrder.deliveryFee != null ? (
               <div className="adm-item-line">
                 <span>هزینه ارسال</span>
@@ -327,6 +353,21 @@ export function OrdersView({
               {openOrder.paymentStatus === "unpaid" && openOrder.paymentMethod !== "cod" ? (
                 <button type="button" className="btn btn-outline btn-sm" onClick={() => onMarkPaid(openOrder.orderNo)}>
                   <Icon name="wallet" /> ثبت پرداخت
+                </button>
+              ) : null}
+              {onRefundToWallet &&
+              openOrder.status === "cancelled" &&
+              openOrder.paymentStatus === "paid" &&
+              openOrder.paymentMethod !== "wallet" &&
+              !openOrder.refundedToWallet ? (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => {
+                    if (confirm(`${fmtPrice(orderDue(openOrder))} تومانِ پرداخت‌شده به کیف پول مشتری برگردد؟`)) onRefundToWallet(openOrder.orderNo);
+                  }}
+                >
+                  <Icon name="wallet" /> برگشت مبلغ به کیف پول
                 </button>
               ) : null}
             </div>

@@ -10,6 +10,8 @@ export interface CouponDoc {
   active: boolean;
   usageCount: number;
   note: string;
+  /** کد شخصی: فقط همین شماره */
+  phone: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,12 +20,13 @@ const CouponSchema = new Schema<CouponDoc>(
   {
     code: { type: String, required: true, unique: true, index: true },
     percent: { type: Number, required: true, min: 1, max: 90 },
-    kind: { type: String, enum: ["public", "loyalty", "birthday"], required: true, index: true },
+    kind: { type: String, enum: ["public", "loyalty", "birthday", "personal"], required: true, index: true },
     expiresAt: { type: Date, default: null, index: true },
     minOrders: { type: Number, default: 0 },
     active: { type: Boolean, default: true, index: true },
     usageCount: { type: Number, default: 0 },
     note: { type: String, default: "" },
+    phone: { type: String, default: "", index: true },
   },
   { timestamps: true }
 );

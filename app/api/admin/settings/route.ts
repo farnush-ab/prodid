@@ -16,6 +16,8 @@ export async function PATCH(req: Request) {
     else if (section === "assistant") requireCan(user, "assistant");
     else if (section === "otp" || section === "blocked") requireCan(user, "security");
     else if (section === "payments") requireCan(user, "payments");
+    else if (section === "wallet") requireCan(user, "settings");
+    else if (section === "insights") requireCan(user, "settings");
     else requireCan(user, "settings");
 
     const patch: Partial<StoreSettings> = {};
@@ -50,6 +52,9 @@ export async function PATCH(req: Request) {
     }
     if (body.features) patch.features = body.features as StoreSettings["features"];
     if (body.payments) patch.payments = body.payments as StoreSettings["payments"];
+    // هر دو در patchStoreSettings با sanitize… محدود و تمیز می‌شوند
+    if (body.wallet) patch.wallet = body.wallet as StoreSettings["wallet"];
+    if (body.insights) patch.insights = body.insights as StoreSettings["insights"];
     if (body.blockedPhones) {
       patch.blockedPhones = body.blockedPhones.map((p) => normalizePhone(p)).filter((p): p is string => !!p);
     }
