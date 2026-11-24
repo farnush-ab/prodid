@@ -111,7 +111,24 @@ export const SALAD_DIETS = [
   { id: "highpro", n: "پرپروتئین" },
 ] as const;
 
-export const SALAD_INGREDIENTS: SaladIngredient[] = [
+/* عکس‌های واقعی مواد (بدون پس‌زمینه) در public/assets/img/salad/<id>.webp.
+   ماده‌ای که عکسش این‌جا نیست — یا ماده‌ی تازه‌ای که از پنل اضافه شود و
+   عکس آپلودی نداشته باشد — همان طرح برداری را می‌گیرد. عکسی که از پنل
+   آپلود شود بر این پیش‌فرض اولویت دارد. */
+const SALAD_PHOTO_IDS = new Set([
+  "kahoo-pich", "kahoo-rasmi", "esfenaj", "kalam-banafsh", "quinoa",
+  "khiar", "goje", "zorrat", "havij", "piaz", "felfel", "zeytoon", "ghaarch", "khiarshoor",
+  "morgh", "bacon", "tokhmemorgh", "jambon", "gusht",
+  "parmezan", "feta", "mozarella",
+  "crouton", "gerdoo", "badam", "konjed", "tokhme", "piaz-sookh", "anar",
+]);
+
+/** آدرس عکس پیش‌فرض یک ماده، یا رشته‌ی خالی اگر عکسی ندارد */
+export function defaultSaladPhoto(id: string): string {
+  return SALAD_PHOTO_IDS.has(id) ? `/assets/img/salad/${id}.webp` : "";
+}
+
+const SALAD_INGREDIENTS_SEED: SaladIngredient[] = [
   // برگ و پایه
   { id: "kahoo-pich", n: "کاهو پیچ", cat: "base", unit: 50, g: 50, price: 7000, kind: "leaf", c: "#8bbf63", c2: "#a8d27f", kcal: 15, pro: 1.4, tags: ["v", "lowcal"] },
   { id: "kahoo-rasmi", n: "کاهو رسمی", cat: "base", unit: 50, g: 50, price: 7000, kind: "leaf", c: "#6ba84a", c2: "#8ec264", kcal: 17, pro: 1.6, tags: ["v", "lowcal"] },
@@ -153,6 +170,11 @@ export const SALAD_INGREDIENTS: SaladIngredient[] = [
   { id: "piaz-sookh", n: "پیاز سوخاری", cat: "top", unit: 15, g: 15, price: 9000, kind: "crumb", c: "#c8863c", c2: "#e0a75d", kcal: 480, pro: 5, tags: ["v"] },
   { id: "anar", n: "دانهٔ انار", cat: "top", unit: 30, g: 30, price: 14000, kind: "kernel", v: "berry", c: "#bb202a", c2: "#e04a50", kcal: 83, pro: 1.7, tags: ["v"] },
 ];
+
+export const SALAD_INGREDIENTS: SaladIngredient[] = SALAD_INGREDIENTS_SEED.map((i) => ({
+  ...i,
+  image: i.image || defaultSaladPhoto(i.id),
+}));
 
 export const SALAD_SAUCES: SaladSauce[] = [
   { id: "caesar", n: "سزار", price: 12000, c: "#f0e2bd", kcal: 470, pro: 2, tags: ["d"], note: "خامه‌ای و کلاسیک" },

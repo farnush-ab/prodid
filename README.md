@@ -254,6 +254,14 @@ find, because it shows up as a blank render, a hydration crash or a phone-only v
   empty and the shop UI would render them blank. They still also open a WhatsApp message, since
   that is how the owner actually watches for orders — the POST happens first, and if it fails the
   WhatsApp tab does not open.
+- **Salad ingredient photos are a read-time fallback, not stored data.** `defaultSaladPhoto(id)` in
+  `lib/salad.ts` maps an ingredient id to `public/assets/img/salad/<id>.webp` (background already
+  removed), and `toIngredient` in `lib/salad-catalog-server.ts` uses it whenever the DB `image` is empty —
+  so the live, already-seeded database got the photos without a migration. A photo uploaded in the
+  admin always wins; clearing it brings the default back, not the vector. Inside the bowl
+  (`saladBowlSvg`) a photo ingredient is drawn as a few photo clumps instead of vector pieces.
+- **The footer trust badge** (`components/Footer.tsx`) is آقای پرداخت's trust logo, loaded from their
+  CDN. It is not Enamad (اینماد) — that one needs its own code from enamad.ir.
 - **OTP delivery degrades silently.** `sendOtpSms` sends an IPPanel pattern message when the SMS
   env vars are set; when they are not, it prints the code to the server console and returns `false`
   instead of failing the request. In a sandbox the server log is the only place to read the code.
@@ -286,6 +294,8 @@ curl -I http://127.0.0.1:3200/        # باید ۲۰۰ بدهد
 
 - Show salad orders in the customer's own order history too (they are filtered out of it today).
 - Revoke and reissue the IPPanel API key — the old one is in git history (`.env.example` itself is clean now).
-- Replace the procedural salad ingredient art with real photographs once the shop provides them
-  (`lib/salad-art.ts` already has an image slot for this).
+- Two salad ingredients still use the procedural vector art because no photo was supplied:
+  `ton` (تن ماهی) and `loobia` (لوبیا چیتی). Drop a background-free `public/assets/img/salad/<id>.webp`
+  and add the id to `SALAD_PHOTO_IDS` in `lib/salad.ts`. `cranberry.webp` is already there for a future
+  «کرن‌بری» ingredient.
 - Refresh `CLAUDE.md` so the admin-API and catalog-source sections match reality.

@@ -3,6 +3,8 @@
 
 const UPLOAD_PREFIX = "/uploads/products/";
 const MEDIA_PREFIX = "/api/media/products/";
+/** عکس‌های پیش‌فرض مواد که همراه کد می‌آیند (lib/salad.ts → defaultSaladPhoto) */
+const STATIC_PREFIX = "/assets/img/salad/";
 
 /** آدرس قابل نمایش؛ رشتهٔ خالی یعنی عکسی نیست و باید طرح برداری رسم شود */
 export function saladImageSrc(image?: string | null): string {
@@ -19,6 +21,6 @@ export function sanitizeSaladImageUrl(raw: unknown): string {
   if (s.includes("..") || s.includes("\\") || s.includes("\0")) {
     throw new Error("آدرس عکس نامعتبر است");
   }
-  if (s.startsWith(MEDIA_PREFIX) || s.startsWith(UPLOAD_PREFIX)) return s.slice(0, 220);
+  if (s.startsWith(MEDIA_PREFIX) || s.startsWith(UPLOAD_PREFIX) || s.startsWith(STATIC_PREFIX)) return s.slice(0, 220);
   throw new Error("آدرس عکس نامعتبر است");
 }
