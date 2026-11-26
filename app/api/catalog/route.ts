@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLiveCatalog, getStoreSettings } from "@/lib/catalog-server";
 import { getSaladCatalog } from "@/lib/salad-catalog-server";
+import { storefrontProduct } from "@/lib/variants";
 
 export const runtime = "nodejs";
 /* بدون این، Next این مسیر را در زمان بیلد اجرا و نتیجه را ثابت می‌کند؛
@@ -12,7 +13,8 @@ export async function GET() {
   try {
     const [catalog, settings, salad] = await Promise.all([getLiveCatalog(), getStoreSettings(), getSaladCatalog()]);
     return NextResponse.json({
-      products: catalog.products,
+      // گونه‌دارها: موجودی و قیمت «از …» از روی گونه‌ها؛ گونه‌ها خودشان هم همراهند
+      products: catalog.products.map(storefrontProduct),
       categories: catalog.categories,
       brand: settings.brand,
       features: settings.features,

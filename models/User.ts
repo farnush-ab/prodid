@@ -9,6 +9,8 @@ export interface UserDoc {
   role: UserRole;
   blocked: boolean;
   staffActive: boolean;
+  /** موجودی کیف پول (تومان). فقط با $inc در lib/wallet-server.ts عوض می‌شود. */
+  walletBalance: number;
   lastLoginAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +30,7 @@ const UserSchema = new Schema<UserDoc>(
     },
     blocked: { type: Boolean, default: false, index: true },
     staffActive: { type: Boolean, default: true },
+    walletBalance: { type: Number, default: 0, min: 0 },
     lastLoginAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

@@ -1,5 +1,6 @@
 import mongoose, { Schema, model, models, type Model } from "mongoose";
 import type { SaleType } from "@/lib/data";
+import type { ProductVariant } from "@/lib/variants";
 
 export interface ProductDoc {
   id: string;
@@ -13,6 +14,7 @@ export interface ProductDoc {
   desc: string;
   badge: string;
   available: boolean;
+  variants: ProductVariant[];
   sort: number;
   createdAt: Date;
   updatedAt: Date;
@@ -31,6 +33,20 @@ const ProductSchema = new Schema<ProductDoc>(
     desc: { type: String, default: "" },
     badge: { type: String, default: "" },
     available: { type: Boolean, default: true },
+    variants: {
+      type: [
+        new Schema<ProductVariant>(
+          {
+            id: { type: String, required: true },
+            label: { type: String, required: true },
+            price: { type: Number, default: null },
+            available: { type: Boolean, default: true },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
     sort: { type: Number, default: 0, index: true },
   },
   { timestamps: true }
@@ -38,7 +54,7 @@ const ProductSchema = new Schema<ProductDoc>(
 
 function productModel(): Model<ProductDoc> {
   const cached = models.Product as Model<ProductDoc> | undefined;
-  if (cached && (!cached.schema.path("image") || !cached.schema.path("images"))) {
+  if (cached && (!cached.schema.path("image") || !cached.schema.path("images") || !cached.schema.path("variants"))) {
     delete (mongoose.models as Record<string, unknown>).Product;
     delete (mongoose.connection.models as Record<string, unknown>).Product;
   }

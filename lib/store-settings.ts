@@ -3,6 +3,8 @@ import { DELIVERY_DAYS, DELIVERY_SLOTS } from "@/lib/order";
 import { INTRO_MSG, PEEK_MSG, RECIPES, type RecipeTip } from "@/lib/assistant-content";
 import { OTP_DEFAULTS, type OtpLimits } from "@/lib/otp-config";
 import type { DeliveryDay, DeliverySlot } from "@/lib/order";
+import { DEFAULT_WALLET_SETTINGS, type WalletSettings } from "@/lib/wallet";
+import { DEFAULT_INSIGHT_SETTINGS, type InsightSettings } from "@/lib/insights";
 
 export interface BrandInfo {
   name: string;
@@ -59,6 +61,8 @@ export interface StoreSettings {
   otp: OtpLimits;
   features: StoreFeatures;
   payments: PaymentDetails;
+  wallet: WalletSettings;
+  insights: InsightSettings;
   blockedPhones: string[];
 }
 
@@ -90,6 +94,8 @@ export const DEFAULT_SETTINGS: StoreSettings = {
     cardNumber: "",
     bankName: "",
   },
+  wallet: { ...DEFAULT_WALLET_SETTINGS },
+  insights: { ...DEFAULT_INSIGHT_SETTINGS },
   blockedPhones: [],
 };
 

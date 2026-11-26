@@ -1,6 +1,8 @@
 import { dbConnect } from "@/lib/mongodb";
 import { CATEGORIES, PRODUCTS, type Category, type Product } from "@/lib/data";
 import { DEFAULT_SETTINGS, type StoreSettings } from "@/lib/store-settings";
+import { sanitizeWalletSettings } from "@/lib/wallet";
+import { sanitizeInsightSettings } from "@/lib/insights";
 import { ensureSeeded } from "@/lib/seed";
 import { Category as CategoryModel } from "@/models/Category";
 import { Product as ProductModel } from "@/models/Product";
@@ -27,6 +29,7 @@ export function toProduct(doc: {
   desc: string;
   badge: string;
   available: boolean;
+  variants?: { id: string; label: string; price: number | null; available: boolean }[] | null;
 }): Product {
   const fromArr = (doc.images || []).map((s) => String(s || "").trim()).filter(Boolean);
   const single = (doc.image || "").trim();
@@ -43,6 +46,12 @@ export function toProduct(doc: {
     desc: doc.desc,
     badge: doc.badge,
     available: doc.available,
+    variants: (doc.variants || []).map((v) => ({
+      id: String(v.id),
+      label: String(v.label),
+      price: v.price ?? null,
+      available: v.available !== false,
+    })),
   };
 }
 
@@ -72,6 +81,8 @@ function mergeSettings(raw: Partial<StoreSettings> | null | undefined): StoreSet
     otp: { ...DEFAULT_SETTINGS.otp, ...(src.otp || {}) },
     features: { ...DEFAULT_SETTINGS.features, ...(src.features || {}) },
     payments: { ...DEFAULT_SETTINGS.payments, ...(src.payments || {}) },
+    wallet: sanitizeWalletSettings(src.wallet),
+    insights: sanitizeInsightSettings(src.insights),
     blockedPhones: src.blockedPhones || [],
   };
 }
@@ -121,6 +132,8 @@ export async function patchStoreSettings(patch: Partial<StoreSettings>): Promise
     features: { ...current.features, ...omitUndef(patch.features) },
     payments: { ...current.payments, ...omitUndef(patch.payments) },
     otp: { ...current.otp, ...omitUndef(patch.otp) },
+    wallet: sanitizeWalletSettings({ ...current.wallet, ...omitUndef(patch.wallet) }),
+    insights: sanitizeInsightSettings({ ...current.insights, ...omitUndef(patch.insights) }),
     assistant: {
       ...current.assistant,
       ...omitUndef(patch.assistant),

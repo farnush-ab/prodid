@@ -82,3 +82,38 @@ export function IconSelect({ name, defaultValue, id }: { name: string; defaultVa
     </select>
   );
 }
+
+/** کاشی عدد کلیدی بالای صفحه — همان ساختار .adm-metric در گزارش‌ها و داشبورد */
+export function MetricCard({
+  icon,
+  label,
+  value,
+  unit,
+  bg,
+  fg,
+  sub,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  unit?: string;
+  bg: string;
+  fg: string;
+  sub?: string;
+}) {
+  return (
+    <div className="adm-metric">
+      <span className="m-ico" style={{ background: bg, color: fg }}>
+        <Icon name={icon} />
+      </span>
+      <span className="m-body">
+        <span className="m-label">{label}</span>
+        <span className="m-value">
+          {value}
+          {unit ? <small>{unit}</small> : null}
+        </span>
+        {sub ? <span className="m-delta flat">{sub}</span> : null}
+      </span>
+    </div>
+  );
+}

@@ -34,6 +34,7 @@ export function toCouponRecord(doc: CouponDoc): CouponRecord {
     active: doc.active !== false,
     usageCount: doc.usageCount || 0,
     note: doc.note || "",
+    ...(doc.phone ? { phone: doc.phone } : {}),
     createdAt: (doc.createdAt || new Date()).toISOString(),
   };
 }
@@ -48,6 +49,7 @@ export function parseCouponInput(body: Record<string, unknown>, isNew: boolean) 
   const kindRaw = String(body.kind || "public");
   if (!isCouponKind(kindRaw)) throw new CouponError("نوع تخفیف نامعتبر است");
   const kind: CouponKind = kindRaw;
+  if (kind === "personal" && isNew) throw new CouponError("کد شخصی فقط از بخش «شناخت مشتری» برای یک مشتری ساخته می‌شود");
   let expiresAt: Date | null = null;
   if (body.expiresAt !== null && body.expiresAt !== undefined && String(body.expiresAt).trim()) {
     const raw = String(body.expiresAt).trim().slice(0, 10);
@@ -88,6 +90,11 @@ async function couponEligibility(
     const used = await CouponRedemption.findOne({ code: coupon.code, phone: ctx.phone }).lean();
     if (used) return { eligible: false, reason: "این کد قبلا برای این شماره استفاده شده است" };
   }
+  if (coupon.kind === "personal") {
+    if (!ctx.phone || ctx.phone !== coupon.phone) {
+      return { eligible: false, reason: "این کد مخصوص مشتری دیگری است" };
+    }
+  }
   if (coupon.kind === "loyalty") {
     if (!ctx.phone) return { eligible: false, reason: "برای کد مشتری ثابت وارد حساب شوید" };
     const n = await deliveredLikeCount(ctx.phone);
@@ -118,6 +125,7 @@ export async function listOffersFor(ctx: { phone?: string | null; userId?: strin
   const out: CouponOffer[] = [];
   for (const c of live) {
     if (c.kind !== "public" && !ctx.userId) continue;
+    if (c.kind === "personal" && c.phone !== ctx.phone) continue;
     const check = await couponEligibility(c, ctx);
     if (c.kind !== "public" && !check.eligible) continue;
     out.push({

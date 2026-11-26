@@ -2,8 +2,11 @@
    پرودید — موتور تصویری سالاد بار
    هر ماده با یک «واژگان شکلی» رسم می‌شود (برگ چین‌دار، رشته،
    حلقه، نوار گریل‌خورده، مکعب پنیر، دانه، خرده، مغز) و همان شکل
-   هم در کاشی انتخاب و هم داخل کاسه استفاده می‌شود. هیچ عکسی لازم
-   نیست؛ هر مادهٔ تازه فقط یک رنگ و یک نوع شکل می‌خواهد.
+   هم در کاشی انتخاب و هم داخل کاسه استفاده می‌شود.
+
+   ماده‌ای که عکس دارد (ing.image — عکس بدون پس‌زمینه) به‌جای قطعه‌های
+   برداری با چند «مشت» از همان عکس داخل کاسه چیده می‌شود. طرح برداری
+   فقط برای ماده‌های بی‌عکس می‌ماند.
 
    جای قطعه‌ها با بذر ثابت تعیین می‌شود تا با کم و زیاد کردن مقدار
    یک ماده، بقیهٔ قطعه‌ها در کاسه جابه‌جا نشوند.
@@ -14,6 +17,7 @@
 
 import type { SaladIndex, SaladIngredient, SaladSauce } from "./salad";
 import { saladById, sauceById } from "./salad";
+import { saladImageSrc } from "./salad-image";
 
 /* ---------- شناسهٔ یکتا برای هر SVG ----------
    چند SVG روی یک صفحه نباید شناسهٔ یکسان تعریف کنند؛ مرورگر اولی را
@@ -319,6 +323,39 @@ function shape(ing: SaladIngredient, r: number, rnd: () => number, simple: boole
   }
 }
 
+/* ---------- عکس مواد ---------- */
+function attr(v: string): string {
+  return v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function photoOf(ing: SaladIngredient): string {
+  return saladImageSrc(ing.image);
+}
+
+/* هر «مشت» عکس چه اندازه‌ای دارد (عرض در واحد کاسه‌ی ۲۴۰تایی) و به ازای
+   هر واحد چند مشت در کاسه ریخته می‌شود. برگ‌ها بزرگ‌ترند و کف را می‌پوشانند. */
+interface PhotoSpec {
+  w: number;
+  per: number;
+  max: number;
+}
+const PHOTO_KIND: Record<string, PhotoSpec> = {
+  leaf: { w: 88, per: 2.6, max: 12 },
+  shred: { w: 56, per: 1.6, max: 8 },
+  ring: { w: 50, per: 1.4, max: 7 },
+  round: { w: 46, per: 1.3, max: 7 },
+  strip: { w: 52, per: 1.3, max: 6 },
+  cube: { w: 46, per: 1.3, max: 6 },
+  nut: { w: 42, per: 1.3, max: 6 },
+  crumb: { w: 42, per: 1.3, max: 6 },
+  kernel: { w: 44, per: 1.3, max: 6 },
+};
+
+function photoImg(href: string, w: number): string {
+  const h = w / 2;
+  return `<image href="${attr(href)}" x="${(-h).toFixed(1)}" y="${(-h).toFixed(1)}" width="${w.toFixed(1)}" height="${w.toFixed(1)}" preserveAspectRatio="xMidYMid meet"/>`;
+}
+
 export interface BowlOptions {
   /** نسخهٔ سبک برای کاسه‌های کوچک (پیشنهادها، سبد) */
   simple?: boolean;
@@ -343,18 +380,33 @@ export function saladBowlSvg(
   const CX = 120;
   const CY = 120;
   const used: SaladIngredient[] = [];
-  const pieces: { ing: SaladIngredient; k: KindSpec; idx: number; slot: { x: number; y: number }; rnd: () => number }[] = [];
+  const pieces: {
+    ing: SaladIngredient;
+    k: KindSpec;
+    idx: number;
+    slot: { x: number; y: number };
+    rnd: () => number;
+    photo: string;
+  }[] = [];
 
   for (const id of Object.keys(items)) {
     const ing = (opts.idx?.ing || saladById)[id];
     if (!ing || !items[id]) continue;
-    used.push(ing);
     const k = SALAD_KIND[ing.kind] || SALAD_KIND.kernel;
-    let count = Math.round(items[id] * k.per * (simple ? 0.6 : 1));
-    count = Math.max(1, Math.min(count, simple ? 18 : 52));
+    const photo = photoOf(ing);
+    let count: number;
+    if (photo) {
+      const ps = PHOTO_KIND[ing.kind] || PHOTO_KIND.kernel;
+      count = Math.round(items[id] * ps.per * (simple ? 0.7 : 1));
+      count = Math.max(1, Math.min(count, simple ? Math.ceil(ps.max * 0.6) : ps.max));
+    } else {
+      used.push(ing);
+      count = Math.round(items[id] * k.per * (simple ? 0.6 : 1));
+      count = Math.max(1, Math.min(count, simple ? 18 : 52));
+    }
     const base = (hash(id) + (opts.toss || 0) * 53) % NSLOT;
     for (let i = 0; i < count; i++) {
-      pieces.push({ ing, k, idx: i, slot: SLOTS[(base + i * 11) % NSLOT], rnd: mulberry(hash(id + "#" + i)) });
+      pieces.push({ ing, k, idx: i, slot: SLOTS[(base + i * 11) % NSLOT], rnd: mulberry(hash(id + "#" + i)), photo });
     }
   }
 
@@ -364,13 +416,18 @@ export function saladBowlSvg(
     .sort((a, b) => a.k.layer - b.k.layer)
     .forEach((p) => {
       const rnd = p.rnd;
-      const sp = p.k.spread * R * 0.9;
+      /* مشت‌های عکس بزرگ‌ترند، پس کمی به مرکز نزدیک‌تر می‌نشینند تا از لبه بیرون نزنند */
+      const sp = p.k.spread * R * (p.photo ? (p.ing.kind === "leaf" ? 0.92 : 0.78) : 0.9);
       const x = CX + p.slot.x * sp;
       const y = CY + p.slot.y * sp * 0.97;
-      const rot = Math.floor(rnd() * 360);
+      /* عکس از زاویه گرفته شده و سایه‌ی زیرش دارد؛ چرخش زیاد آن را وارونه نشان می‌دهد */
+      const rot = p.photo ? Math.floor(rnd() * 70 - 35) : Math.floor(rnd() * 360);
       const sc = (0.82 + rnd() * 0.34).toFixed(2);
-      const body = shape(p.ing, p.k.r, rnd, simple, ns);
-      const lay = (p.ing.kind === "leaf" ? "L" : "S") + p.k.layer;
+      const body = p.photo
+        ? photoImg(p.photo, (PHOTO_KIND[p.ing.kind] || PHOTO_KIND.kernel).w * (simple ? 1.1 : 1))
+        : shape(p.ing, p.k.r, rnd, simple, ns);
+      /* عکس‌ها لایه‌ی جدا دارند (P) تا فیلتر «ارگانیک» برداری رویشان نیفتد */
+      const lay = (p.photo ? "P" : p.ing.kind === "leaf" ? "L" : "S") + p.k.layer;
       /* پوستهٔ میانی transform ندارد تا انیمیشن CSS با transform موقعیت تداخل نکند */
       const pf = opts.pop && opts.pop.id === p.ing.id ? opts.pop.from : Infinity;
       const inner =
@@ -384,7 +441,7 @@ export function saladBowlSvg(
   Object.keys(layers)
     .sort((a, b) => +a.slice(-1) - +b.slice(-1))
     .forEach((k) => {
-      const fl = simple ? "" : k[0] === "L" ? ` filter="url(#orgL-${ns})"` : ` filter="url(#orgS-${ns})"`;
+      const fl = simple || k[0] === "P" ? "" : k[0] === "L" ? ` filter="url(#orgL-${ns})"` : ` filter="url(#orgS-${ns})"`;
       g += `<g${fl}>${layers[k].join("")}</g>`;
     });
 
@@ -435,6 +492,10 @@ export function saladBowlSvg(
 
 /** یک قطعهٔ تنها و بزرگ — برای موادِ شناور دور کاسه و قطعهٔ در حال پرواز */
 export function saladPieceSvg(ing: SaladIngredient): string {
+  const photo = photoOf(ing);
+  if (photo) {
+    return `<svg viewBox="0 0 48 48" aria-hidden="true"><g transform="translate(24 24)">${photoImg(photo, 48)}</g></svg>`;
+  }
   const k = SALAD_KIND[ing.kind] || SALAD_KIND.kernel;
   const ns = nsid();
   let g = "";

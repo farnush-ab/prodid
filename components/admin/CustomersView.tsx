@@ -3,36 +3,60 @@
 import { useMemo, useState } from "react";
 import { fmtPrice, faNum } from "@/lib/format";
 import type { AdminCustomer, AdminOrder } from "@/lib/admin-data";
-import { orderPayable } from "@/lib/coupon";
-import { AppModal } from "@/components/AppModal";
-import { EmptyRow, StatusPill } from "./shared";
+import { EmptyRow } from "./shared";
+import { CustomerProfile } from "./CustomerProfile";
 
 export function CustomersView({
   customers,
   orders,
+  openPhone,
+  onOpen,
+  canWallet,
+  canNudge,
+  canBlock,
   onToggleBlock,
 }: {
   customers: AdminCustomer[];
   orders: AdminOrder[];
+  openPhone: string | null;
+  onOpen: (phone: string | null) => void;
+  canWallet: boolean;
+  canNudge: boolean;
+  canBlock: boolean;
   onToggleBlock: (phone: string, value: boolean) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [openPhone, setOpenPhone] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
     return customers.filter((c) => !q || c.name.toLowerCase().includes(q) || c.phone.includes(q));
   }, [customers, search]);
 
-  const openCustomer = customers.find((c) => c.phone === openPhone) || null;
-  const history = openCustomer ? orders.filter((o) => o.customer.phone === openCustomer.phone) : [];
+  const openCustomer =
+    customers.find((c) => c.phone === openPhone) ||
+    (openPhone ? { name: "بدون نام", phone: openPhone, orders: 0, spent: 0, last: "—", status: "active" as const } : null);
+
+  if (openCustomer) {
+    return (
+      <CustomerProfile
+        key={openCustomer.phone}
+        customer={openCustomer}
+        orders={orders}
+        canWallet={canWallet}
+        canNudge={canNudge}
+        canBlock={canBlock}
+        onBack={() => onOpen(null)}
+        onToggleBlock={onToggleBlock}
+      />
+    );
+  }
 
   return (
     <div>
       <div className="adm-page-head">
         <div>
           <h1>مشتریان</h1>
-          <p>حساب‌های ثبت‌شده با ورود موبایلی و تاریخچه خرید هرکدام</p>
+          <p>برای دیدن پروندهٔ کامل — الگوی خرید، نمودارها، کیف پول و پیام‌ها — روی هر مشتری بزنید</p>
         </div>
       </div>
 
@@ -57,7 +81,7 @@ export function CustomersView({
             <tbody>
               {rows.length ? (
                 rows.map((c) => (
-                  <tr key={c.phone} className="clickable" onClick={() => setOpenPhone(c.phone)}>
+                  <tr key={c.phone} className="clickable" onClick={() => onOpen(c.phone)}>
                     <td className="adm-cell-main">{c.name}</td>
                     <td>{c.phone}</td>
                     <td className="amount">{faNum.format(c.orders)}</td>
@@ -75,62 +99,6 @@ export function CustomersView({
           </table>
         </div>
       </div>
-
-      {openCustomer ? (
-        <AppModal title={openCustomer.name} subtitle={openCustomer.phone} icon="user" onClose={() => setOpenPhone(null)}>
-          <div className="adm-dgrid" style={{ marginBottom: 16 }}>
-            <div className="adm-dblock">
-              <label>تعداد سفارش</label>
-              <div className="val">{faNum.format(openCustomer.orders)}</div>
-            </div>
-            <div className="adm-dblock">
-              <label>مجموع خرید</label>
-              <div className="val">{fmtPrice(openCustomer.spent)} تومان</div>
-            </div>
-            <div className="adm-dblock">
-              <label>آخرین سفارش</label>
-              <div className="val">{openCustomer.last}</div>
-            </div>
-            <div className="adm-dblock" style={{ gridColumn: "1 / -1" }}>
-              <label>آدرس</label>
-              <div className="val" style={{ fontWeight: 500, fontSize: "0.8rem", lineHeight: 1.9 }}>
-                {openCustomer.address || "—"}
-              </div>
-            </div>
-            <div className="adm-dblock">
-              <label>تاریخ تولد</label>
-              <div className="val">{openCustomer.birthDate || "ثبت نشده"}</div>
-            </div>
-          </div>
-
-          <div className="acc-setting-row" style={{ padding: "0 0 16px" }}>
-            <div>
-              <b>مسدودسازی حساب</b>
-              <span className="hint">در صورت فعال بودن، امکان ورود و سفارش جدید ندارد</span>
-            </div>
-            <label className="acc-switch">
-              <input type="checkbox" checked={openCustomer.status === "blocked"} onChange={(e) => onToggleBlock(openCustomer.phone, e.target.checked)} />
-              <span className="track" />
-              <span className="thumb" />
-            </label>
-          </div>
-
-          <div className="adm-cell-sub" style={{ marginBottom: 8 }}>
-            تاریخچه سفارش
-          </div>
-          {history.length ? (
-            history.map((o) => (
-              <div className="adm-item-line" key={o.orderNo}>
-                <span>{o.orderNo}</span>
-                <StatusPill status={o.status} />
-                <span>{fmtPrice(orderPayable(o))} تومان</span>
-              </div>
-            ))
-          ) : (
-            <p className="hint">هنوز سفارشی ثبت نشده</p>
-          )}
-        </AppModal>
-      ) : null}
     </div>
   );
 }

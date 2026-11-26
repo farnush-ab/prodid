@@ -14,7 +14,7 @@
 
 import { useSyncExternalStore } from "react";
 import type { Product } from "./data";
-import { getLiveProduct } from "./catalog-store";
+import { getLiveProduct, useCatalog } from "./catalog-store";
 
 const CART_KEY = "prodid_cart";
 export const MIN_WEIGHT = 0.1; // حداقل وزن سفارش: ۱۰۰ گرم
@@ -65,14 +65,19 @@ export function defaultAdd(p: Product) {
 
 /** هوک ری‌اکتی؛ در حین رندر همیشه از این استفاده شود (سازگار با hydration) */
 export function useCart(): CartMap {
+  /* ردیف‌های سبد از روی کاتالوگ زنده ساخته می‌شوند (محصولات و گونه‌های تازه فقط
+     آن‌جا هستند)، پس با رسیدن /api/catalog هم باید دوباره رندر شود */
+  useCatalog();
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
 export function cartQty(cart: CartMap, id: string) {
   return cart[id] || 0;
 }
+/* فقط ردیف‌هایی که هنوز به محصول (یا گونهٔ) زنده می‌رسند؛ مثلا ردیف محصولی که
+   بعدا گونه‌دار شده دیگر شمرده نمی‌شود */
 export function cartCount(cart: CartMap) {
-  return Object.keys(cart).length;
+  return cartItems(cart).length;
 }
 export function cartItems(cart: CartMap) {
   return Object.entries(cart)

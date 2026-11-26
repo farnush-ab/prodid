@@ -12,6 +12,7 @@ export function PaymentSheet({
   busy,
   coupon,
   subtotal,
+  walletPart = 0,
   onPay,
 }: {
   items: { p: Product; qty: number }[];
@@ -21,9 +22,11 @@ export function PaymentSheet({
   busy?: boolean;
   coupon?: { code: string; percent: number } | null;
   subtotal?: number;
+  /** سهم کیف پول؛ total همان مانده‌ای است که به درگاه می‌رود */
+  walletPart?: number;
   onPay: () => void;
 }) {
-  const discount = coupon && subtotal != null ? Math.max(0, subtotal - total) : 0;
+  const discount = coupon && subtotal != null ? Math.max(0, subtotal - total - walletPart) : 0;
   return (
     <div className="pay-sheet">
       <div className="pay-amount-box">
@@ -51,6 +54,12 @@ export function PaymentSheet({
             <span>−{fmtPrice(discount)}</span>
           </div>
         ) : null}
+        {walletPart ? (
+          <div className="pay-sheet-row">
+            <span>از کیف پول</span>
+            <span>−{fmtPrice(walletPart)}</span>
+          </div>
+        ) : null}
       </div>
 
       {phone ? (
@@ -60,7 +69,7 @@ export function PaymentSheet({
       ) : null}
 
       <button type="button" className="btn btn-primary btn-block" disabled={busy} onClick={onPay}>
-        <Icon name="card" /> {busy ? "در حال انتقال به درگاه…" : "پرداخت از طریق زرین‌پال"}
+        <Icon name="card" /> {busy ? "در حال انتقال به درگاه…" : "رفتن به درگاه پرداخت"}
       </button>
       <p className="muted text-center mt-1">پس از پرداخت، به‌صورت خودکار به همین صفحه برمی‌گردید.</p>
     </div>

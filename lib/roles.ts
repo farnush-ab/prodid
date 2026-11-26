@@ -24,7 +24,9 @@ export type AdminSection =
   | "reports"
   | "coupons"
   | "salad"
-  | "salad-catalog";
+  | "salad-catalog"
+  | "wallet"
+  | "insights";
 
 const ALL_SECTIONS: AdminSection[] = [
   "dashboard",
@@ -42,13 +44,15 @@ const ALL_SECTIONS: AdminSection[] = [
   "coupons",
   "salad",
   "salad-catalog",
+  "wallet",
+  "insights",
 ];
 
 export const ROLE_SECTIONS: Record<StaffRole, AdminSection[]> = {
   owner: ALL_SECTIONS,
-  orders: ["dashboard", "orders", "salad", "salad-catalog", "payments", "customers", "delivery", "coupons", "reports"],
-  catalog: ["dashboard", "products", "categories", "salad-catalog", "assistant", "reports"],
-  support: ["dashboard", "orders", "salad", "customers", "assistant", "coupons", "reports"],
+  orders: ["dashboard", "orders", "salad", "salad-catalog", "payments", "customers", "delivery", "coupons", "reports", "wallet", "insights"],
+  catalog: ["dashboard", "products", "categories", "salad-catalog", "assistant", "reports", "insights"],
+  support: ["dashboard", "orders", "salad", "customers", "assistant", "coupons", "reports", "wallet", "insights"],
 };
 
 export function isStaffRole(role?: string | null): role is StaffRole {
@@ -76,6 +80,8 @@ export function canMutate(
     | "coupons"
     | "salad"
     | "salad-catalog"
+    | "wallet"
+    | "insights"
 ): boolean {
   if (role === "owner") return true;
   switch (action) {
@@ -85,6 +91,12 @@ export function canMutate(
       return role === "orders" || role === "support";
     case "salad-catalog":
       return role === "catalog";
+    /* پول جابه‌جا می‌کند: فقط مالک و مدیر سفارش‌ها. پشتیبانی فقط می‌بیند. */
+    case "wallet":
+      return role === "orders";
+    /* پیام بازگشت به مشتری (پیامک + کد تخفیف شخصی) */
+    case "insights":
+      return role === "orders" || role === "support";
     case "orders.cancel":
       return role === "orders";
     case "payments":

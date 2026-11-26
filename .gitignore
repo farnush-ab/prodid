@@ -8,7 +8,12 @@ Thumbs.db
 /build
 *.tsbuildinfo
 next-env.d.ts
-.env*.local
+# تنظیمات محیط — هیچ‌کدام نباید کامیت شوند.
+# docker-compose با env_file: .env بالا می‌آید، پس فایل واقعی سرور هم
+# همین‌جا کنار پروژه است و باید نادیده گرفته شود.
+.env
+.env.*
+!.env.example
 
 # npm
 npm-debug.log*

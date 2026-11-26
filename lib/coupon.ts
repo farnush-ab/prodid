@@ -1,12 +1,13 @@
 import { toEnDigits } from "@/lib/phone";
 
-export const COUPON_KINDS = ["public", "loyalty", "birthday"] as const;
+export const COUPON_KINDS = ["public", "loyalty", "birthday", "personal"] as const;
 export type CouponKind = (typeof COUPON_KINDS)[number];
 
 export const COUPON_KIND_LABEL: Record<CouponKind, string> = {
   public: "عمومی",
   loyalty: "مشتری ثابت",
   birthday: "تولد",
+  personal: "شخصی (بازگشت مشتری)",
 };
 
 export const DEFAULT_LOYALTY_MIN_ORDERS = 3;
@@ -25,6 +26,8 @@ export interface CouponRecord {
   active: boolean;
   usageCount: number;
   note: string;
+  /** فقط برای کد شخصی: تنها همین شماره می‌تواند استفاده کند */
+  phone?: string;
   createdAt: string;
 }
 

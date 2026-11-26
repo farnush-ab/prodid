@@ -24,6 +24,7 @@ import { Profile } from "@/lib/profile";
 import { toast } from "@/lib/toast";
 import { normalizePhone } from "@/lib/phone";
 import { couponDiscountAmount, COUPON_KIND_LABEL, type CouponOffer } from "@/lib/coupon";
+import { walletShare, type WalletSummary } from "@/lib/wallet";
 import { AppModal } from "@/components/AppModal";
 import { LoginPanel } from "@/components/LoginPanel";
 import { PaymentSheet } from "@/components/PaymentSheet";
@@ -111,6 +112,33 @@ function CheckoutForm() {
   const [offers, setOffers] = useState<CouponOffer[]>([]);
   const discount = applied ? couponDiscountAmount(total, applied.percent) : 0;
   const payable = Math.max(0, total - discount);
+
+  /* کیف پول: موجودی از /api/wallet؛ پیش‌فرض روشن وقتی موجودی هست */
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletOn, setWalletOn] = useState(false);
+  const [useWallet, setUseWallet] = useState(true);
+  const walletPart = walletOn && useWallet ? walletShare(payable, walletBalance) : 0;
+  const due = Math.max(0, payable - walletPart);
+  const walletCoversAll = walletPart > 0 && due === 0;
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      setWalletOn(false);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/wallet")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { wallet?: WalletSummary } | null) => {
+        if (cancelled || !data?.wallet) return;
+        setWalletBalance(data.wallet.balance);
+        setWalletOn(data.wallet.enabled && data.wallet.balance > 0);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.id]);
 
   useEffect(() => {
     const local = Profile.read();
@@ -213,7 +241,7 @@ function CheckoutForm() {
       return;
     }
 
-    if (pay === "online") {
+    if (pay === "online" && !walletCoversAll) {
       if (!session?.user) {
         loginNext.current = "pay";
         setModal("login");
@@ -235,9 +263,10 @@ function CheckoutForm() {
           address: addr,
           day,
           slot,
-          pay,
+          pay: walletCoversAll ? "wallet" : pay,
           notes,
           couponCode: applied?.code,
+          useWallet: walletPart > 0,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -296,6 +325,7 @@ function CheckoutForm() {
         pay: "online",
         notes,
         couponCode: applied?.code,
+        useWallet: walletPart > 0,
       });
       Profile.write({ name: n, phone: ph, address: addr });
       try {
@@ -304,7 +334,14 @@ function CheckoutForm() {
         /* ignore */
       }
       Cart.clear();
-      window.location.href = paymentUrl;
+      if (paymentUrl) {
+        window.location.href = paymentUrl;
+        return;
+      }
+      // کیف پول کل مبلغ را پرداخت کرد
+      const q = new URLSearchParams({ done: "1", no: order.orderNo, paid: "1" });
+      if (order.viewToken) q.set("t", order.viewToken);
+      router.push(`${pageHref("checkout")}?${q.toString()}`);
     } catch (err) {
       toast(err instanceof Error ? err.message : "اتصال به درگاه انجام نشد");
       setBusy(false);
@@ -423,7 +460,25 @@ function CheckoutForm() {
           <h3>
             <span className="step-num">۴</span> روش پرداخت
           </h3>
-          {payMethods.map((m) => (
+          {walletOn ? (
+            <label className={`pay-option wl-pay-option${useWallet ? " on" : ""}`}>
+              <input type="checkbox" checked={useWallet} onChange={(e) => setUseWallet(e.target.checked)} />
+              <span>
+                <b>
+                  <Icon name="wallet" /> پرداخت از کیف پول
+                </b>
+                <span>
+                  موجودی {fmtPrice(walletBalance)} تومان
+                  {useWallet
+                    ? walletCoversAll
+                      ? " — کل مبلغ سفارش از کیف پول پرداخت می‌شود."
+                      : ` — ${fmtPrice(walletPart)} تومان از کیف پول، ${fmtPrice(due)} تومان با روش زیر.`
+                    : ""}
+                </span>
+              </span>
+            </label>
+          ) : null}
+          {walletCoversAll ? null : payMethods.map((m) => (
             <label className="pay-option" key={m.id}>
               <input type="radio" name="pay" value={m.id} checked={pay === m.id} onChange={() => setPay(m.id)} />
               <span>
@@ -506,11 +561,23 @@ function CheckoutForm() {
             <span>−{fmtPrice(discount)} تومان</span>
           </div>
         ) : null}
-        {applied ? (
+        {applied && !walletPart ? (
           <div className="sum-row total">
             <span>قابل پرداخت</span>
             <span>{fmtPrice(payable)} تومان</span>
           </div>
+        ) : null}
+        {walletPart ? (
+          <>
+            <div className="sum-row discount">
+              <span>از کیف پول</span>
+              <span>−{fmtPrice(walletPart)} تومان</span>
+            </div>
+            <div className="sum-row total">
+              <span>{walletCoversAll ? "باقی‌مانده" : "باقی‌مانده برای پرداخت"}</span>
+              <span>{fmtPrice(due)} تومان</span>
+            </div>
+          </>
         ) : null}
         {cartHasWeightItems(cart) ? (
           <p className="sum-note">
@@ -532,8 +599,8 @@ function CheckoutForm() {
           </p>
         ) : null}
         <button type="submit" className="btn btn-primary btn-block" disabled={busy || underMin || features.maintenance}>
-          <Icon name={pay === "online" ? "card" : "check"} />{" "}
-          {busy ? "در حال ثبت…" : pay === "online" ? "ادامه و پرداخت" : "ثبت سفارش"}
+          <Icon name={walletCoversAll ? "wallet" : pay === "online" ? "card" : "check"} />{" "}
+          {busy ? "در حال ثبت…" : walletCoversAll ? "ثبت و پرداخت با کیف پول" : pay === "online" ? "ادامه و پرداخت" : "ثبت سفارش"}
         </button>
         <a className="btn btn-outline btn-block mt-1" href={`tel:${brand.phone}`}>
           <Icon name="phone" /> ثبت سفارش با تماس
@@ -573,7 +640,7 @@ function CheckoutForm() {
     {modal === "pay" ? (
       <AppModal
         title="پرداخت آنلاین"
-        subtitle="با تایید، به درگاه امن زرین‌پال منتقل می‌شوید"
+        subtitle="با تایید، به درگاه امن پرداخت منتقل می‌شوید"
         icon="card"
         wide
         onClose={() => {
@@ -582,9 +649,10 @@ function CheckoutForm() {
       >
         <PaymentSheet
           items={items}
-          total={payable}
+          total={due}
           subtotal={total}
           coupon={applied}
+          walletPart={walletPart}
           hasWeight={cartHasWeightItems(cart)}
           phone={session?.user.phone || phone}
           busy={busy}

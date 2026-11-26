@@ -24,7 +24,7 @@ test suite, so a typecheck, a build and a real browser pass are the only safety 
 | Database | MongoDB via Mongoose 9 (`models/*.ts`) |
 | Auth | NextAuth 4 — a single `phone-otp` Credentials provider, JWT sessions, 30-day maxAge |
 | SMS | IPPanel pattern messages (`lib/ippanel.ts`, `lib/sms.ts`) |
-| Payment | ZarinPal (`lib/zarinpal.ts`, `app/api/payments/zarinpal/*`) |
+| Payment | آقای پرداخت (`lib/aqayepardakht.ts`) — primary, used for wallet top-up and online orders. ZarinPal (`lib/zarinpal.ts`) is the fallback when `AQAYEPARDAKHT_PIN` is unset |
 | Order handoff | WhatsApp `wa.me` deep links (`lib/order.ts`) — still how the owner actually receives orders |
 | Icons & art | Inline SVG only (`lib/icons.tsx`, `lib/salad-art.ts`). No icon package |
 | Runtime | Docker (`Dockerfile` + `docker-compose.yml`) on the owner's own server |
@@ -118,10 +118,14 @@ api/catalog                 public catalog + settings snapshot for the browser
 api/me                      read/patch the logged-in user's profile
 api/orders, orders/[no]     create / list-mine / fetch one (guest access via viewToken)
 api/coupons                 list the offers available to the caller / preview a coupon code
-api/payments/zarinpal/*     request + callback
+api/payments/zarinpal/request   start an online payment (name is historical: it uses whichever gateway is active)
+api/payments/zarinpal/callback  ZarinPal return
+api/payments/aqayepardakht/callback  آقای پرداخت return (POST form) — W… invoice = wallet top-up, PD… = order
+api/wallet, wallet/topup    the logged-in customer's wallet summary / start a top-up
 api/media/products/[file]   serves uploaded images out of the uploads/ volume
 api/admin/*                 state, orders, products, categories, coupons, customers, team,
-                            settings, and the two image-upload endpoints
+                            settings, the image-upload endpoints, wallet (+ topups/[id] re-verify),
+                            insights, customers/[phone]/{wallet,insights,nudge}
 ```
 
 Every `api/admin/*` route calls `requireStaff()` and then `requireCan(user, "<section>")`.
@@ -140,6 +144,9 @@ protected at the API, not the route.
 | `lib/salad.ts` / `lib/salad-art.ts` | Salad data + maths / the seeded-PRNG SVG drawing engine |
 | `lib/phone.ts` | Normalises Iranian numbers and Persian/Arabic digits to `09xxxxxxxxx` |
 | `lib/toast.tsx` | Imperative `toast()` + `<ToastHost/>` mounted once in the root layout |
+| `lib/variants.ts` | Product variants (e.g. «ظرف ۴۰۰ گرمی» / «ظرف ۵۰۰ گرمی»), each with its own price and stock. A cart/order line for a variant uses the key `productId~variantId`; `getLiveProduct(key)` returns a derived product (`lineProduct`) whose id is that key, name is «نام — گونه» and price/stock are the variant's, so cart and checkout code didn't change. The plain id of a product that has variants is **not** buyable. `/api/catalog` sends `storefrontProduct()` (price = cheapest available variant, shown as «از …») |
+| `lib/wallet.ts` / `lib/wallet-server.ts` | Customer wallet. Balance lives on `User.walletBalance` and **only** changes through `creditWallet`/`debitWallet` (atomic `$inc`, debit conditional on balance) — each writes one `WalletTxn` ledger row. `dedupe` keys make refunds/top-ups/cashback idempotent |
+| `lib/insights.ts` / `lib/insights-server.ts` | Customer insights: per-customer buying pattern (products, weekday, gap, segment) and «late habit» alerts; store-wide overview; owner-approved win-back SMS + personal coupon (`sendNudge`) |
 | `lib/icons.tsx` | Every icon in the site. Add new ones here; a missing key renders nothing |
 
 ## Run it
@@ -188,6 +195,7 @@ Notes that will save you an hour:
 | Change the seed for a brand-new database | `lib/data.ts` (`price: null` = «قیمت روی تماس», `available: false` = out of stock, `sale: "w"` = per-kg / `"u"` = per package) |
 | Add a storefront page | New folder under `app/(site)/`, `"use client"` page, plus a `layout.tsx` exporting only `metadata` if it needs a title |
 | Add it to the menu | **Two places.** `lib/nav.ts` feeds the desktop header and the footer; `components/BottomNav.tsx` has its own hardcoded list and is the *only* navigation on a phone, because `.main-nav` is `display: none` below 768px. A link added to `lib/nav.ts` alone is unreachable on mobile |
+| Sell one product in several sizes/packs | `/admin` → محصولات → ویرایش → «گونه‌ها»: one row per size with its own price and on/off. No new product needed. Order lines keep `productId` = the product, plus `variantId`/`variantLabel` |
 | Add an icon | `lib/icons.tsx` |
 | Add an admin tab | A view in `components/admin/`, the id in `AdminView`+nav in `components/admin/AdminShell.tsx`, the section in `lib/roles.ts` (type, `ALL_SECTIONS`, `ROLE_SECTIONS`, `canMutate`), the data in `lib/admin-state.ts`, and the block in `app/admin/page.tsx` |
 | Add an admin section | A view in `components/admin/`, a tab in `app/admin/page.tsx`, a route under `app/api/admin/`, and the section name in `lib/roles.ts` |
@@ -228,10 +236,13 @@ find, because it shows up as a blank render, a hydration crash or a phone-only v
    reorders them (`PRODID1@`). Scope `dir="ltr"` to the Latin-only span.
 8. **Persian digits everywhere in the UI.** `toLocaleString("fa-IR")` with `٬` as the thousands
    separator. A stray `100 گرم` next to `۱۴٬۰۰۰` is a visible bug.
-9. **Never commit secrets.** `.env*.local` is gitignored and must stay out of git.
-   ⚠️ `.env.example` is committed and currently contains what looks like a **real IPPanel API key
-   and pattern codes**. It should be rotated and replaced with empty placeholders. Do not copy that
-   key anywhere, and never add a live secret to a tracked file.
+9. **Never commit secrets.** `.gitignore` covers `.env` and `.env.*` with a single exception for
+   `.env.example`, which is a template: variable names only, never a value. Real values live in
+   `.env.local` (development) and `.env` on the server (`docker-compose.yml` loads it with
+   `env_file: .env`, which is why that path must stay ignored).
+   ⚠️ A live IPPanel API key was committed in `.env.example` until it was emptied; **it is still in
+   git history**, so that key must be revoked and reissued in the IPPanel panel. Emptying the file
+   does not undo the exposure.
 10. **Never run `npm audit fix --force`.** It upgrades Next.js to 16 and breaks the project. Patch
     advisories by hand, within the 14.2 line.
 11. **`uploads/` is runtime data, not source.** Uploaded product and category images live there and
@@ -242,6 +253,35 @@ find, because it shows up as a blank render, a hydration crash or a phone-only v
 12. **Do not delete the client-side localStorage layer** because the backend exists. Guest checkout
     and the cart still depend on it.
 
+## Wallet (کیف پول) — how money moves
+
+- **Top-up:** `/account` → «کیف پول» → آقای پرداخت → callback verifies → `creditWallet(type: "topup", dedupe: topup:<invoice>)`.
+  A top-up whose return was lost shows as «ناموفق»/«در انتظار» in admin → «کیف پول مشتریان» → «بررسی دوباره»
+  asks the gateway directly and credits it if the money arrived.
+- **Paying:** checkout has a «پرداخت از کیف پول» option (on by default when there is a balance). The wallet pays up
+  to the payable amount; if it covers everything the order is `paymentMethod: "wallet"`, already paid; otherwise the
+  rest (`orderDue()`) goes through the chosen method. `Order.walletUsed` records the wallet share.
+- **Cancel:** the wallet share always comes back automatically. Money paid outside the wallet (online/card) comes back
+  automatically when the *customer* cancels; when *staff* cancel, there is an explicit «برگشت مبلغ به کیف پول» button.
+- **Weighed items:** when staff save a final total, excess wallet share is refunded; if a wallet-paid order got more
+  expensive, the difference is taken from the wallet if possible, otherwise it is collected on delivery.
+- **Cashback:** optional %, credited when an order becomes «تحویل شده» (settings in the wallet tab; 0 = off).
+- **Manual credit/debit:** customer profile → «افزایش/کسر موجودی», a reason is mandatory and is logged with the
+  staff phone. Only `owner` and `orders` roles can move money; `support` can only look.
+- The customer profile shows a ledger check: if stored balance ≠ sum of the ledger it says so.
+
+## Customer insights (شناخت مشتری)
+
+- Admin → «شناخت مشتری»: queue of customers behind their usual rhythm, segments, weekday/month charts, products
+  that bring people back, top customers, and how many messaged customers bought again within 30 days.
+- Admin → «مشتریان» → a customer: full profile with the same charts for that one person, alerts like
+  «معمولاً هر ۷ روز جوجه زعفرانی می‌خرید، بیشتر پنجشنبه‌ها — ۵ هفته است نخریده», wallet, orders and message history.
+- Nothing is sent automatically. «پیام» creates a one-time personal coupon (kind `personal`, valid only for that
+  phone) and sends `IPPANEL_PATTERN_WINBACK`, or sends `IPPANEL_PATTERN_REMINDER`, or just logs a phone call. After a
+  message the customer rests for `cooldownDays` before showing up as «آمادهٔ پیام» again.
+- Detection rules are editable in the same tab. Pure maths lives in `lib/insights.ts` and can be unit-tested without
+  a database.
+
 ## Known gaps — do not mistake these for bugs
 
 - **Salad orders are stored, but in their own lane.** They live in the same `orders` collection
@@ -251,6 +291,14 @@ find, because it shows up as a blank render, a hydration crash or a phone-only v
   empty and the shop UI would render them blank. They still also open a WhatsApp message, since
   that is how the owner actually watches for orders — the POST happens first, and if it fails the
   WhatsApp tab does not open.
+- **Salad ingredient photos are a read-time fallback, not stored data.** `defaultSaladPhoto(id)` in
+  `lib/salad.ts` maps an ingredient id to `public/assets/img/salad/<id>.webp` (background already
+  removed), and `toIngredient` in `lib/salad-catalog-server.ts` uses it whenever the DB `image` is empty —
+  so the live, already-seeded database got the photos without a migration. A photo uploaded in the
+  admin always wins; clearing it brings the default back, not the vector. Inside the bowl
+  (`saladBowlSvg`) a photo ingredient is drawn as a few photo clumps instead of vector pieces.
+- **The footer trust badge** (`components/Footer.tsx`) is آقای پرداخت's trust logo, loaded from their
+  CDN. It is not Enamad (اینماد) — that one needs its own code from enamad.ir.
 - **OTP delivery degrades silently.** `sendOtpSms` sends an IPPanel pattern message when the SMS
   env vars are set; when they are not, it prints the code to the server console and returns `false`
   instead of failing the request. In a sandbox the server log is the only place to read the code.
@@ -282,7 +330,8 @@ curl -I http://127.0.0.1:3200/        # باید ۲۰۰ بدهد
 ## Suggested next steps
 
 - Show salad orders in the customer's own order history too (they are filtered out of it today).
-- Rotate the IPPanel key and empty out `.env.example`.
-- Replace the procedural salad ingredient art with real photographs once the shop provides them
-  (`lib/salad-art.ts` already has an image slot for this).
+- Revoke and reissue the IPPanel API key — the old one is in git history (`.env.example` itself is clean now).
+- Every seeded salad ingredient now has a photo. For a new one: drop a background-free
+  `public/assets/img/salad/<id>.webp` and add the id to `SALAD_PHOTO_IDS` in `lib/salad.ts` (or just
+  upload a photo from the admin). `cranberry.webp` is already there for a future «کرن‌بری» ingredient.
 - Refresh `CLAUDE.md` so the admin-API and catalog-source sections match reality.

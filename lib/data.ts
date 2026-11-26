@@ -5,6 +5,8 @@
    برای محصولات عددی (sale: "u") قیمت هر بسته/عدد است.
    --------------------------------------------------------- */
 
+import type { ProductVariant } from "@/lib/variants";
+
 export type SaleType = "w" | "u";
 
 export interface Category {
@@ -30,6 +32,11 @@ export interface Product {
   desc: string;
   badge: string;
   available: boolean;
+  /** گونه‌ها (مثلا اندازهٔ ظرف) — هرکدام قیمت و موجودی خودش؛ خالی = محصول ساده. lib/variants.ts */
+  variants?: ProductVariant[];
+  /** فقط روی ردیف گونه در سبد/سفارش: شناسهٔ محصول اصلی و عنوان گونه */
+  baseId?: string;
+  variantLabel?: string;
 }
 
 export const BRAND = {

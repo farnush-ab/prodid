@@ -17,6 +17,10 @@ import { ReportsView } from "@/components/admin/ReportsView";
 import { CouponsView } from "@/components/admin/CouponsView";
 import { SaladBarView } from "@/components/admin/SaladBarView";
 import { SaladCatalogView } from "@/components/admin/SaladCatalogView";
+import { WalletView } from "@/components/admin/WalletView";
+import { InsightsView } from "@/components/admin/InsightsView";
+import type { WalletSettings } from "@/lib/wallet";
+import type { InsightSettings } from "@/lib/insights";
 import { toast } from "@/lib/toast";
 import { adminFetch } from "@/lib/admin-client";
 import { canAccessSection, canMutate, type StaffRole } from "@/lib/roles";
@@ -52,6 +56,8 @@ export default function AdminPage() {
   const [coupons, setCoupons] = useState<CouponRecord[]>([]);
   const [saladOrders, setSaladOrders] = useState<PublicSaladOrder[]>([]);
   const [saladCatalog, setSaladCatalog] = useState<SaladCatalog>(SEED_SALAD_CATALOG);
+  /** پروندهٔ مشتری باز در تب مشتریان — از کیف پول و شناخت مشتری هم باز می‌شود */
+  const [customerPhone, setCustomerPhone] = useState<string | null>(null);
 
   const applyState = useCallback((state: AdminState) => {
     setMe(state.me);
@@ -122,7 +128,27 @@ export default function AdminPage() {
       toast("به این بخش دسترسی ندارید");
       return;
     }
+    if (next === "customers") setCustomerPhone(null);
     setView(next);
+  }
+
+  function openCustomer(phone: string) {
+    if (!canAccessSection(role, "customers")) {
+      toast("به پروندهٔ مشتری‌ها دسترسی ندارید");
+      return;
+    }
+    setCustomerPhone(phone);
+    setView("customers");
+  }
+
+  async function saveSection(section: "wallet" | "insights", body: { wallet?: WalletSettings; insights?: InsightSettings }) {
+    await run("تنظیمات ذخیره شد", async () => {
+      const data = await adminFetch<{ settings: StoreSettings }>("/api/admin/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ section, ...body }),
+      });
+      setSettings(data.settings);
+    });
   }
 
   async function patchOrder(orderNo: string, body: Record<string, unknown>, msg: string) {
@@ -222,6 +248,11 @@ export default function AdminPage() {
           onMarkPaid={(orderNo) => patchOrder(orderNo, { action: "markPaid" }, `پرداخت سفارش ${orderNo} تایید شد`)}
           onSaveTotals={(orderNo, finalTotal, deliveryFee) =>
             patchOrder(orderNo, { finalTotal, deliveryFee }, `مبلغ نهایی سفارش ${orderNo} ذخیره شد`)
+          }
+          onRefundToWallet={
+            canMutate(role, "wallet")
+              ? (orderNo) => patchOrder(orderNo, { action: "refundToWallet" }, `مبلغ سفارش ${orderNo} به کیف پول مشتری برگشت`)
+              : undefined
           }
         />
       )}
@@ -464,6 +495,11 @@ export default function AdminPage() {
         <CustomersView
           customers={customers}
           orders={orders}
+          openPhone={customerPhone}
+          onOpen={setCustomerPhone}
+          canWallet={canMutate(role, "wallet")}
+          canNudge={canMutate(role, "insights")}
+          canBlock={canMutate(role, "customers")}
           onToggleBlock={async (phone, value) => {
             await run(value ? "حساب مسدود شد" : "حساب رفع مسدودی شد", async () => {
               await adminFetch(`/api/admin/customers/${encodeURIComponent(phone)}`, {
@@ -678,6 +714,24 @@ export default function AdminPage() {
               setSettings(data.settings);
             });
           }}
+        />
+      )}
+      {view === "wallet" && (
+        <WalletView
+          settings={settings.wallet}
+          canEdit={canMutate(role, "wallet")}
+          canSettings={canMutate(role, "settings")}
+          onOpenCustomer={openCustomer}
+          onSaveSettings={(wallet) => saveSection("wallet", { wallet })}
+        />
+      )}
+      {view === "insights" && (
+        <InsightsView
+          settings={settings.insights}
+          canNudge={canMutate(role, "insights")}
+          canSettings={canMutate(role, "settings")}
+          onOpenCustomer={openCustomer}
+          onSaveSettings={(insights) => saveSection("insights", { insights })}
         />
       )}
       {view === "reports" && <ReportsView orders={orders} products={products} revenueSeries={revenueSeries} categories={categories} />}

@@ -8,6 +8,12 @@ import { toFa } from "@/lib/format";
 import { NAV_LINKS } from "@/lib/nav";
 import { pageHref } from "@/lib/page";
 
+/* نماد اعتماد درگاه «آقای پرداخت» — کد همان است که پنل درگاه داده؛ فقط
+   onclick رشته‌ای به هندلر React تبدیل شده و href واقعی گذاشته شده تا
+   بدون جاوااسکریپت هم صفحه‌ی تأیید باز شود. */
+const TRUST_URL = "https://panel.aqayepardakht.ir/trustGateway/108789";
+const TRUST_LOGO = "https://cdn.aqayepardakht.ir/trustlogo/2.svg";
+
 export function Footer() {
   const [year, setYear] = useState("");
   const { brand } = useCatalog();
@@ -28,6 +34,22 @@ export function Footer() {
               فروشگاه تخصصی مواد پروتئینی و فودشاپ در {brand.city}؛ گوشت و استیک تازه، محصولات کبابی و مزه‌دار،
               سوسیس و کالباس، برگر خانگی و سبزیجات نیمه‌آماده — با ارسال سریع در سطح شهر {brand.city}.
             </p>
+            <div className="footer-trust">
+              <a
+                href={TRUST_URL}
+                target="_blank"
+                rel="noopener"
+                referrerPolicy="strict-origin-when-cross-origin"
+                title="پرداخت امن آقای پرداخت"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.open(TRUST_URL, "_blank", "width=400,height=600,scrollbars=no,resizable=no");
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={TRUST_LOGO} alt="پرداخت امن آقای پرداخت" loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />
+              </a>
+            </div>
           </div>
           <div>
             <h4>دسترسی سریع</h4>

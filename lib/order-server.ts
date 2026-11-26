@@ -26,6 +26,11 @@ import {
 import { orderPayable, type OrderCoupon } from "@/lib/coupon";
 import { CouponError, recordCouponRedemption, releaseCouponForOrder, validateCouponForOrder } from "@/lib/coupon-server";
 import { notifyOrderSms, notifyPaymentSms } from "@/lib/sms";
+import { orderDue } from "@/lib/order";
+import { walletShare } from "@/lib/wallet";
+import { hasVariants, lineProduct, splitKey } from "@/lib/variants";
+import { WalletError, creditWallet, debitWallet, ensureUserByPhone, getBalance } from "@/lib/wallet-server";
+import { AqayepardakhtError, aqayepardakhtCreate, aqayepardakhtVerify, isAqayepardakhtConfigured } from "@/lib/aqayepardakht";
 
 const MAX_ITEMS = 40;
 const MAX_NOTES = 500;
@@ -57,6 +62,7 @@ export function toPublicOrder(doc: OrderDoc & { _id: Types.ObjectId }, opts?: { 
     },
     items: doc.items.map((it) => ({
       productId: it.productId,
+      ...(it.variantId ? { variantId: it.variantId, variantLabel: it.variantLabel || "" } : {}),
       name: it.name,
       sale: it.sale,
       qty: it.qty,
@@ -74,7 +80,11 @@ export function toPublicOrder(doc: OrderDoc & { _id: Types.ObjectId }, opts?: { 
     deliveryFee: doc.deliveryFee ?? null,
     hasWeightItems: doc.hasWeightItems,
     coupon: couponFromDoc(doc),
-    zarinpalRefId: doc.zarinpalRefId || "",
+    zarinpalRefId: doc.payRef || doc.zarinpalRefId || "",
+    payRef: doc.payRef || doc.zarinpalRefId || "",
+    walletUsed: doc.walletUsed || 0,
+    cashback: doc.cashback || 0,
+    refundedToWallet: doc.refundedToWallet || 0,
     createdAt: (doc.createdAt || new Date()).toISOString(),
     ...(opts?.token ? { viewToken: doc.viewToken } : {}),
   };
@@ -104,8 +114,19 @@ function buildItems(
     if (!id || seen.has(id)) throw new OrderError("سبد خرید نامعتبر است");
     seen.add(id);
 
-    const product = catalog.find((p) => p.id === id);
-    if (!product) throw new OrderError("یکی از محصولات دیگر موجود نیست");
+    /* id یا شناسهٔ محصول ساده است، یا `محصول~گونه` برای محصول گونه‌دار */
+    const { productId, variantId } = splitKey(id);
+    const base = catalog.find((p) => p.id === productId);
+    if (!base) throw new OrderError("یکی از محصولات دیگر موجود نیست");
+    let product = base;
+    if (hasVariants(base)) {
+      if (!variantId) throw new OrderError(`برای «${base.name}» یک گونه (مثلا اندازه) انتخاب کنید`);
+      const v = base.variants!.find((x) => x.id === variantId);
+      if (!v) throw new OrderError(`گونهٔ انتخاب‌شدهٔ «${base.name}» دیگر وجود ندارد؛ سبد را به‌روز کنید`);
+      product = lineProduct(base, v);
+    } else if (variantId) {
+      throw new OrderError(`«${base.name}» دیگر گونه ندارد؛ سبد را به‌روز کنید`);
+    }
     if (!product.available) throw new OrderError(`«${product.name}» ناموجود است`);
     if (product.price === null) throw new OrderError(`قیمت «${product.name}» نیاز به استعلام دارد`);
 
@@ -126,7 +147,8 @@ function buildItems(
 
     const lineTotal = Math.round(product.price * nextQty);
     items.push({
-      productId: product.id,
+      productId: base.id,
+      ...(product.variantLabel ? { variantId: variantId!, variantLabel: product.variantLabel } : {}),
       name: product.name,
       sale: product.sale,
       qty: nextQty,
@@ -169,6 +191,11 @@ export async function createOrder(
   if (input.pay === "online" && !settings.features.onlinePay) {
     throw new OrderError("پرداخت آنلاین فعلا فعال نیست");
   }
+  const useWallet = input.pay === "wallet" || Boolean(input.useWallet);
+  if (useWallet) {
+    if (!sessionUser) throw new OrderError("برای پرداخت با کیف پول ابتدا وارد حساب شوید", 401);
+    if (!settings.wallet.enabled) throw new OrderError("کیف پول فعلا غیرفعال است");
+  }
 
   const { products } = await getLiveCatalog();
   const { items, estimatedTotal, hasWeightItems } = buildItems(input.items, products);
@@ -195,6 +222,19 @@ export async function createOrder(
     throw new OrderError("تعداد سفارش‌های این شماره در یک ساعت گذشته زیاد است. کمی بعد تلاش کنید.", 429);
   }
 
+  /* سهم کیف پول: تا سقف مبلغ قابل پرداخت. اگر کل مبلغ را بپوشاند سفارش
+     همین حالا «پرداخت‌شده» با روش کیف پول ثبت می‌شود. */
+  const payable = orderPayable({ estimatedTotal, finalTotal: null, coupon });
+  let walletUsed = 0;
+  let payMethod = input.pay;
+  if (useWallet && sessionUser) {
+    walletUsed = walletShare(payable, await getBalance(sessionUser.id));
+    if (walletUsed >= payable && payable > 0) payMethod = "wallet";
+    else if (input.pay === "wallet") {
+      throw new OrderError("موجودی کیف پول برای کل سفارش کافی نیست؛ یک روش پرداخت دیگر هم انتخاب کنید");
+    }
+  }
+
   const order = await Order.create({
     orderNo: await nextOrderNo(),
     viewToken: randomBytes(16).toString("hex"),
@@ -204,8 +244,9 @@ export async function createOrder(
     notes,
     day: input.day,
     slot: input.slot,
-    paymentMethod: input.pay,
-    paymentStatus: "unpaid",
+    paymentMethod: payMethod,
+    paymentStatus: payMethod === "wallet" ? "paid" : "unpaid",
+    walletUsed,
     status: "pending",
     estimatedTotal,
     finalTotal: null,
@@ -220,6 +261,26 @@ export async function createOrder(
     } catch (err) {
       await Order.deleteOne({ _id: order._id });
       if (err instanceof CouponError) throw new OrderError(err.message, err.status);
+      throw err;
+    }
+  }
+
+  if (walletUsed > 0 && sessionUser) {
+    try {
+      await debitWallet({
+        userId: sessionUser.id,
+        amount: walletUsed,
+        type: "order",
+        orderNo: order.orderNo,
+        note: `پرداخت سفارش ${order.orderNo}`,
+        dedupe: `order:${order.orderNo}`,
+        sms: false,
+      });
+    } catch (err) {
+      // موجودی در همین فاصله خرج شده (مثلا سفارش هم‌زمان از دستگاه دیگر) → سفارش ثبت نشود
+      await Order.deleteOne({ _id: order._id });
+      if (coupon) await releaseCouponForOrder(order.orderNo);
+      if (err instanceof WalletError) throw new OrderError(err.message, err.status);
       throw err;
     }
   }
@@ -283,10 +344,24 @@ export async function findOrderByAuthority(authority: string) {
   return Order.findOne({ zarinpalAuthority: value });
 }
 
+/** درگاه فعال برای پرداخت آنلاین: آقای پرداخت اگر تنظیم شده، وگرنه زرین‌پال */
+export function activeGateway(): "aqayepardakht" | "zarinpal" | null {
+  if (isAqayepardakhtConfigured()) return "aqayepardakht";
+  if (isZarinpalConfigured()) return "zarinpal";
+  return null;
+}
+
 function assertZarinpalReady() {
-  if (!isZarinpalConfigured()) {
-    throw new ZarinpalError("مرچنت‌آیدی زرین‌پال روی سرور تنظیم نشده است", 503);
+  if (!activeGateway()) {
+    throw new OrderError("درگاه پرداخت روی سرور تنظیم نشده است", 503);
   }
+}
+
+export async function findOrderByGatewayTransId(transid: string) {
+  await dbConnect();
+  const value = String(transid || "").trim();
+  if (!value) return null;
+  return Order.findOne({ gatewayTransId: value });
 }
 
 async function requestZarinpalForOrder(doc: OrderDoc & { save: () => Promise<unknown> }, appUrl?: string) {
@@ -300,14 +375,27 @@ async function requestZarinpalForOrder(doc: OrderDoc & { save: () => Promise<unk
     throw new OrderError("سفارش لغو شده است");
   }
 
+  const due = orderDue({ estimatedTotal: doc.estimatedTotal, finalTotal: doc.finalTotal, coupon: couponFromDoc(doc), walletUsed: doc.walletUsed });
+
+  if (activeGateway() === "aqayepardakht") {
+    const { transid, paymentUrl } = await aqayepardakhtCreate({
+      amountToman: due,
+      appUrl: appUrl || process.env.NEXTAUTH_URL || "http://localhost:3000",
+      invoiceId: doc.orderNo,
+      mobile: doc.customer.phone,
+      description: `سفارش ${doc.orderNo} — پرودید`,
+    });
+    doc.gateway = "aqayepardakht";
+    doc.gatewayTransId = transid;
+    if (doc.paymentStatus === "failed") doc.paymentStatus = "unpaid";
+    await doc.save();
+    return paymentUrl;
+  }
+
   const config = getZarinpalConfig(appUrl);
   const { authority } = await zarinpalRequestPayment(
     {
-      amountToman: orderPayable({
-        estimatedTotal: doc.estimatedTotal,
-        finalTotal: doc.finalTotal,
-        coupon: couponFromDoc(doc),
-      }),
+      amountToman: due,
       description: `سفارش ${doc.orderNo} — پرودید`,
       mobile: doc.customer.phone,
       orderId: doc.orderNo,
@@ -316,6 +404,7 @@ async function requestZarinpalForOrder(doc: OrderDoc & { save: () => Promise<unk
   );
 
   doc.zarinpalAuthority = authority;
+  doc.gateway = "zarinpal";
   if (doc.paymentStatus === "failed") doc.paymentStatus = "unpaid";
   await doc.save();
 
@@ -329,6 +418,8 @@ export async function startOnlinePaymentForNewOrder(
 ) {
   assertZarinpalReady();
   const created = await createOrder({ ...input, pay: "online" }, user);
+  // کیف پول کل مبلغ را پوشانده → درگاه لازم نیست
+  if (created.paymentMethod === "wallet") return { order: created, paymentUrl: "" };
   const doc = await findOrderByNo(created.orderNo);
   if (!doc) throw new OrderError("سفارش ثبت شد اما برای پرداخت پیدا نشد", 500);
   const paymentUrl = await requestZarinpalForOrder(doc, appUrl);
@@ -366,11 +457,12 @@ export async function finalizeZarinpalCallback(authority: string, status: string
 
   try {
     const verified = await zarinpalVerifyPayment(
-      { amountToman: orderPayable({ estimatedTotal: doc.estimatedTotal, finalTotal: doc.finalTotal, coupon: couponFromDoc(doc) }), authority },
+      { amountToman: orderDue({ estimatedTotal: doc.estimatedTotal, finalTotal: doc.finalTotal, coupon: couponFromDoc(doc), walletUsed: doc.walletUsed }), authority },
       getZarinpalConfig(appUrl)
     );
     doc.paymentStatus = "paid";
     doc.zarinpalRefId = verified.refId;
+    doc.payRef = verified.refId;
     await doc.save();
     const paid = toPublicOrder(doc, { token: true });
     notifyPaymentSms(paid, true);
@@ -387,6 +479,164 @@ export async function finalizeZarinpalCallback(authority: string, status: string
   }
 }
 
+/** بازگشت از آقای پرداخت برای پرداخت یک سفارش. چند بار صدا زدن امن است. */
+export async function finalizeAqayepardakhtOrder(params: { transid: string; status: string; trackingNumber?: string }) {
+  const doc = await findOrderByGatewayTransId(params.transid);
+  if (!doc) throw new OrderError("سفارش این پرداخت پیدا نشد", 404);
+  if (doc.paymentStatus === "paid") return { order: toPublicOrder(doc, { token: true }), paid: true as const };
+
+  const fail = async () => {
+    doc.paymentStatus = "failed";
+    await doc.save();
+    const failed = toPublicOrder(doc, { token: true });
+    notifyPaymentSms(failed, false);
+    return { order: failed, paid: false as const };
+  };
+
+  if (params.status !== "1") return fail();
+  try {
+    await aqayepardakhtVerify({
+      amountToman: orderDue({ estimatedTotal: doc.estimatedTotal, finalTotal: doc.finalTotal, coupon: couponFromDoc(doc), walletUsed: doc.walletUsed }),
+      transid: params.transid,
+    });
+  } catch (err) {
+    if (err instanceof AqayepardakhtError) return fail();
+    throw err;
+  }
+  doc.paymentStatus = "paid";
+  doc.payRef = String(params.trackingNumber || "").slice(0, 64);
+  await doc.save();
+  const paid = toPublicOrder(doc, { token: true });
+  notifyPaymentSms(paid, true);
+  return { order: paid, paid: true as const };
+}
+
+/* ---------- برگشت وجه به کیف پول ---------- */
+
+async function walletOwnerOf(doc: OrderDoc) {
+  if (doc.userId) return { _id: doc.userId };
+  return ensureUserByPhone(doc.customer.phone);
+}
+
+/**
+ * بعد از لغو: سهم کیف پول همیشه برمی‌گردد. مبلغی که آنلاین یا کارت‌به‌کارت
+ * پرداخت شده هم به کیف پول برمی‌گردد (مگر includePaid=false). هر بخش کلید
+ * یکتای خودش را دارد، پس دو بار صدا زدن پول را دو بار برنمی‌گرداند.
+ */
+export async function refundCancelledOrderToWallet(
+  doc: OrderDoc & { save: () => Promise<unknown> },
+  opts: { includePaid: boolean; by?: string }
+) {
+  if (doc.status !== "cancelled") throw new OrderError("فقط سفارش لغوشده قابل برگشت وجه است");
+  const owner = await walletOwnerOf(doc);
+  let total = 0;
+  if (doc.walletUsed > 0) {
+    const r = await creditWallet({
+      userId: owner._id,
+      amount: doc.walletUsed,
+      type: "refund",
+      orderNo: doc.orderNo,
+      note: `برگشت سهم کیف پول سفارش لغوشده ${doc.orderNo}`,
+      by: opts.by || "",
+      dedupe: `refund-wallet:${doc.orderNo}`,
+    });
+    if (!r.duplicate) total += doc.walletUsed;
+  }
+  const paidOutside =
+    doc.paymentStatus === "paid" && doc.paymentMethod !== "wallet"
+      ? orderDue({ estimatedTotal: doc.estimatedTotal, finalTotal: doc.finalTotal, coupon: couponFromDoc(doc), walletUsed: doc.walletUsed })
+      : 0;
+  if (opts.includePaid && paidOutside > 0 && !doc.refundedToWallet) {
+    const r = await creditWallet({
+      userId: owner._id,
+      amount: paidOutside,
+      type: "refund",
+      orderNo: doc.orderNo,
+      note: `برگشت مبلغ پرداخت‌شدهٔ سفارش لغوشده ${doc.orderNo}`,
+      by: opts.by || "",
+      dedupe: `refund-paid:${doc.orderNo}`,
+    });
+    doc.refundedToWallet = paidOutside;
+    await doc.save();
+    if (!r.duplicate) total += paidOutside;
+  }
+  return total;
+}
+
+/**
+ * وقتی مبلغ نهایی (وزن واقعی) ثبت می‌شود: اگر سهم کیف پول از مبلغ جدید
+ * بیشتر است، مازاد برمی‌گردد. اگر سفارش تمام با کیف پول پرداخت شده و مبلغ
+ * بالا رفته، مابه‌التفاوت تا جایی که موجودی هست کسر می‌شود و باقی در محل
+ * دریافت می‌شود.
+ */
+export async function settleWalletAfterTotalChange(doc: OrderDoc & { save: () => Promise<unknown> }, by = "") {
+  if (doc.status === "cancelled" || !doc.walletUsed) return;
+  const payable = orderPayable({ estimatedTotal: doc.estimatedTotal, finalTotal: doc.finalTotal, coupon: couponFromDoc(doc) });
+  const owner = await walletOwnerOf(doc);
+  if (doc.walletUsed > payable) {
+    const excess = doc.walletUsed - payable;
+    await creditWallet({
+      userId: owner._id,
+      amount: excess,
+      type: "refund",
+      orderNo: doc.orderNo,
+      note: `مازاد مبلغ نهایی سفارش ${doc.orderNo}`,
+      by,
+      dedupe: `excess:${doc.orderNo}:${doc.walletUsed}:${payable}`,
+    });
+    doc.walletUsed = payable;
+    await doc.save();
+    return;
+  }
+  if (doc.paymentMethod === "wallet" && payable > doc.walletUsed) {
+    const diff = payable - doc.walletUsed;
+    const take = walletShare(diff, await getBalance(owner._id));
+    if (take > 0) {
+      try {
+        await debitWallet({
+          userId: owner._id,
+          amount: take,
+          type: "order",
+          orderNo: doc.orderNo,
+          note: `مابه‌التفاوت مبلغ نهایی سفارش ${doc.orderNo}`,
+          by,
+          dedupe: `diff:${doc.orderNo}:${doc.walletUsed}:${payable}`,
+          sms: true,
+        });
+        doc.walletUsed += take;
+      } catch (err) {
+        if (!(err instanceof WalletError)) throw err;
+      }
+    }
+    if (doc.walletUsed < payable) doc.paymentStatus = "unpaid";
+    await doc.save();
+  }
+}
+
+/** اعتبار هدیهٔ درصدی بعد از تحویل — یک بار برای هر سفارش */
+export async function grantCashback(doc: OrderDoc & { save: () => Promise<unknown> }) {
+  if (doc.status !== "delivered" || doc.cashback > 0 || doc.kind === "salad") return 0;
+  const settings = await getStoreSettings();
+  const w = settings.wallet;
+  if (!w.enabled || w.cashbackPercent <= 0) return 0;
+  const payable = orderPayable({ estimatedTotal: doc.estimatedTotal, finalTotal: doc.finalTotal, coupon: couponFromDoc(doc) });
+  let amount = Math.floor((payable * w.cashbackPercent) / 100);
+  if (w.cashbackMax > 0) amount = Math.min(amount, w.cashbackMax);
+  if (amount <= 0) return 0;
+  const owner = await walletOwnerOf(doc);
+  await creditWallet({
+    userId: owner._id,
+    amount,
+    type: "cashback",
+    orderNo: doc.orderNo,
+    note: `${w.cashbackPercent.toLocaleString("fa-IR")}٪ اعتبار هدیهٔ سفارش ${doc.orderNo}`,
+    dedupe: `cashback:${doc.orderNo}`,
+  });
+  doc.cashback = amount;
+  await doc.save();
+  return amount;
+}
+
 export async function cancelOrder(orderNo: string, user: { id: string; phone: string }) {
   const doc = await findOrderByNo(orderNo);
   if (!doc) throw new OrderError("سفارش پیدا نشد", 404);
@@ -397,6 +647,8 @@ export async function cancelOrder(orderNo: string, user: { id: string; phone: st
   doc.status = "cancelled";
   await doc.save();
   await releaseCouponForOrder(doc.orderNo);
+  // مشتری خودش لغو کرده: هرچه پرداخته (کیف پول و آنلاین) به کیف پولش برمی‌گردد
+  await refundCancelledOrderToWallet(doc, { includePaid: true });
   const publicOrder = toPublicOrder(doc);
   notifyOrderSms(publicOrder);
   return publicOrder;

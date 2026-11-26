@@ -1,5 +1,6 @@
 import type { CreateOrderInput, PublicOrder } from "@/lib/order";
 
+/* نام قدیمی مانده؛ سرور خودش درگاه فعال (آقای پرداخت یا زرین‌پال) را انتخاب می‌کند */
 export async function requestZarinpalCheckout(body: Partial<CreateOrderInput> & { orderNo?: string }) {
   const res = await fetch("/api/payments/zarinpal/request", {
     method: "POST",
@@ -10,8 +11,9 @@ export async function requestZarinpalCheckout(body: Partial<CreateOrderInput> & 
   if (!res.ok) {
     throw new Error(data.error || "اتصال به درگاه انجام نشد");
   }
-  if (!data.paymentUrl || !data.order) {
+  if (!data.order) {
     throw new Error("آدرس درگاه دریافت نشد");
   }
-  return { paymentUrl: data.paymentUrl, order: data.order };
+  /* paymentUrl خالی یعنی کیف پول کل مبلغ را پرداخت کرده و درگاه لازم نیست */
+  return { paymentUrl: data.paymentUrl || "", order: data.order };
 }

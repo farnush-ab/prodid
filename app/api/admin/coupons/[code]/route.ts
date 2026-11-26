@@ -31,6 +31,9 @@ export async function PATCH(req: Request, { params }: { params: { code: string }
       },
       false
     );
+    if ((parsed.kind === "personal") !== (doc.kind === "personal")) {
+      return NextResponse.json({ error: "نوع کد شخصی قابل تغییر نیست" }, { status: 400 });
+    }
     doc.percent = parsed.percent;
     doc.kind = parsed.kind;
     doc.expiresAt = parsed.expiresAt;

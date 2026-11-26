@@ -13,6 +13,7 @@ import {
   SALAD_PRESETS,
   SALAD_SAUCES,
   SALAD_SIZES,
+  defaultSaladPhoto,
   type SaladCatalog,
   type SaladIngredient,
   type SaladPreset,
@@ -109,7 +110,10 @@ function toIngredient(d: SaladIngredientDoc): SaladIngredient {
     pro: d.pro,
     tags: (d.tags || []) as SaladTag[],
     ...(d.ulabel ? { ulabel: d.ulabel } : {}),
-    image: d.image || "",
+    /* دیتابیسِ سرور قبل از اضافه شدن عکس‌ها seed شده و فیلد image آن
+       خالی است؛ به‌جای مهاجرت، عکس پیش‌فرض همین‌جا جایگزین می‌شود.
+       عکسی که از پنل آپلود شده اولویت دارد. */
+    image: d.image || defaultSaladPhoto(d.id),
     available: d.available !== false,
   };
 }

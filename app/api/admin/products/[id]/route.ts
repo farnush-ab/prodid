@@ -6,6 +6,7 @@ import { deleteStoredProductImage } from "@/lib/product-image-server";
 import { Product } from "@/models/Product";
 import { Category } from "@/models/Category";
 import type { SaleType } from "@/lib/data";
+import { priceFromVariants, sanitizeVariants } from "@/lib/variants";
 
 export const runtime = "nodejs";
 
@@ -47,6 +48,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       if (!Number.isFinite(n) || n < 0) return NextResponse.json({ error: "قیمت نامعتبر است" }, { status: 400 });
       doc.price = Math.round(n);
     }
+    if (Array.isArray(body.variants)) doc.variants = sanitizeVariants(body.variants);
+    // گونه‌دار: قیمت ذخیره‌شده همیشه کمترین قیمت گونه‌هاست
+    if (doc.variants?.length) doc.price = priceFromVariants(doc.variants, doc.price);
     await doc.save();
     if (nextImages !== undefined) {
       const removed = prevImages.filter((u) => !nextImages!.includes(u));

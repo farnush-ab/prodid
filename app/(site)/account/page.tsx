@@ -21,13 +21,16 @@ import {
 } from "@/lib/order";
 import { requestZarinpalCheckout } from "@/lib/zarinpal-client";
 import { orderPayable } from "@/lib/coupon";
+import { WalletPanel } from "@/components/WalletPanel";
+import type { WalletSummary } from "@/lib/wallet";
 
-type TabId = "overview" | "profile" | "orders" | "settings";
+type TabId = "overview" | "profile" | "orders" | "wallet" | "settings";
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: "overview", label: "نمای کلی", icon: "grid" },
   { id: "profile", label: "اطلاعات من", icon: "note" },
   { id: "orders", label: "سفارش‌های من", icon: "package" },
+  { id: "wallet", label: "کیف پول", icon: "wallet" },
   { id: "settings", label: "تنظیمات", icon: "shield" },
 ];
 
@@ -48,6 +51,19 @@ export default function AccountPage() {
   const [assistantOn, setAssistantOn] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [payingNo, setPayingNo] = useState<string | null>(null);
+  const [wallet, setWallet] = useState<WalletSummary | null>(null);
+
+  /* بازگشت از درگاه شارژ: ?wallet=ok|failed — با location خوانده می‌شود تا
+     صفحه به Suspense و useSearchParams نیاز پیدا نکند */
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const w = q.get("wallet");
+    if (!w) return;
+    setActiveTab("wallet");
+    const amount = Number(q.get("amount") || 0);
+    toast(w === "ok" ? `کیف پول ${amount ? fmtPrice(amount) + " تومان " : ""}شارژ شد` : "شارژ کیف پول انجام نشد؛ اگر مبلغی کم شده تا ۷۲ ساعت برمی‌گردد");
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   useEffect(() => {
     const local = Profile.read();
@@ -56,7 +72,11 @@ export default function AccountPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [meRes, orderRes] = await Promise.all([fetch("/api/me"), fetch("/api/orders")]);
+        const [meRes, orderRes, walletRes] = await Promise.all([fetch("/api/me"), fetch("/api/orders"), fetch("/api/wallet")]);
+        if (walletRes.ok) {
+          const data = await walletRes.json();
+          if (!cancelled) setWallet(data.wallet || null);
+        }
         if (meRes.ok) {
           const me = await meRes.json();
           if (!cancelled) {
@@ -152,7 +172,8 @@ export default function AccountPage() {
     setPayingNo(orderNo);
     try {
       const { paymentUrl } = await requestZarinpalCheckout({ orderNo });
-      window.location.href = paymentUrl;
+      if (paymentUrl) window.location.href = paymentUrl;
+      else location.reload();
     } catch (err) {
       toast(err instanceof Error ? err.message : "اتصال به درگاه انجام نشد");
       setPayingNo(null);
@@ -270,6 +291,15 @@ export default function AccountPage() {
                       <span>مجموع خرید (تومان)</span>
                     </div>
                   </div>
+                  <button type="button" className="acc-stat wl-stat-link" onClick={() => setActiveTab("wallet")}>
+                    <span className="s-ico">
+                      <Icon name="wallet" />
+                    </span>
+                    <div>
+                      <b>{loaded ? fmtPrice(wallet?.balance ?? 0) : "—"}</b>
+                      <span>موجودی کیف پول (تومان)</span>
+                    </div>
+                  </button>
                   <div className="acc-stat">
                     <span className="s-ico">
                       <Icon name="clock" />
@@ -338,6 +368,8 @@ export default function AccountPage() {
                 </form>
               </div>
             )}
+
+            {activeTab === "wallet" && <WalletPanel wallet={wallet} loaded={loaded} />}
 
             {activeTab === "orders" && (
               <div>
@@ -459,6 +491,9 @@ function OrderCard({
       <div className="muted" style={{ fontSize: ".75rem" }}>
         پرداخت: {PAY_METHOD_LABEL[o.paymentMethod]} — {PAY_STATUS_LABEL[o.paymentStatus]}
         {o.coupon ? ` — تخفیف ${o.coupon.percent}٪ (${o.coupon.code})` : ""}
+        {o.walletUsed ? ` — از کیف پول ${fmtPrice(o.walletUsed)} تومان` : ""}
+        {o.cashback ? ` — هدیه به کیف پول ${fmtPrice(o.cashback)} تومان` : ""}
+        {o.status === "cancelled" && (o.walletUsed || o.refundedToWallet) ? " — مبلغ به کیف پول برگشت" : ""}
       </div>
       <div className="order-actions">
         {canPayOnlineOrder(o) ? (

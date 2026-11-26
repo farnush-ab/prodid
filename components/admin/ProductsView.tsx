@@ -17,6 +17,21 @@ import {
 import { toast } from "@/lib/toast";
 import { AppModal } from "@/components/AppModal";
 import { EmptyRow } from "./shared";
+import { MAX_VARIANTS, type ProductVariant } from "@/lib/variants";
+
+/* ردیف ویرایش گونه؛ قیمت به‌صورت متن نگه داشته می‌شود تا خالی (استعلامی) هم ممکن باشد */
+type DraftVariant = { key: string; id: string; label: string; price: string; available: boolean };
+const toDraftVariants = (p: Product | null): DraftVariant[] =>
+  (p?.variants || []).map((v, i) => ({ key: `${v.id}-${i}`, id: v.id, label: v.label, price: v.price === null ? "" : String(v.price), available: v.available }));
+const fromDraftVariants = (rows: DraftVariant[]): ProductVariant[] =>
+  rows
+    .filter((r) => r.label.trim())
+    .map((r) => ({
+      id: r.id,
+      label: r.label.trim(),
+      price: r.price.trim() ? Number(r.price.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))).replace(/[^\d]/g, "")) : null,
+      available: r.available,
+    }));
 
 type AdminProduct = Product & { sold: number };
 
@@ -70,6 +85,7 @@ export function ProductsView({
   const [editing, setEditing] = useState<AdminProduct | "new" | null>(null);
   const [photos, setPhotos] = useState<DraftPhoto[]>([]);
   const [saving, setSaving] = useState(false);
+  const [variants, setVariants] = useState<DraftVariant[]>([]);
 
   const sellable = categories.filter((c) => !c.soon);
   const catName = (id: string) => categories.find((c) => c.id === id)?.name || id;
@@ -88,6 +104,7 @@ export function ProductsView({
       }
       return draftFromProduct(editing === "new" || !editing ? null : editing);
     });
+    setVariants(toDraftVariants(editing === "new" || !editing ? null : editing));
     setSaving(false);
   }, [editing]);
 
@@ -154,7 +171,8 @@ export function ProductsView({
     const name = (form.elements.namedItem("name") as HTMLInputElement).value.trim();
     const cat = (form.elements.namedItem("cat") as HTMLSelectElement).value;
     const sale = (form.elements.namedItem("sale") as RadioNodeList).value as SaleType;
-    const priceRaw = (form.elements.namedItem("price") as HTMLInputElement).value.trim();
+    const priceRaw = ((form.elements.namedItem("price") as HTMLInputElement | null)?.value || "").trim();
+    const nextVariants = fromDraftVariants(variants);
     const badge = (form.elements.namedItem("badge") as HTMLInputElement).value.trim();
     const desc = (form.elements.namedItem("desc") as HTMLTextAreaElement).value.trim();
     const available = (form.elements.namedItem("available") as HTMLInputElement).checked;
@@ -184,8 +202,22 @@ export function ProductsView({
             badge,
             desc,
             available,
+            variants: nextVariants,
           }
-        : { ...(draft as AdminProduct), name, cat, sale, ic, image, images, price: priceRaw ? Number(priceRaw.replace(/[^\d]/g, "")) : null, badge, desc, available };
+        : {
+            ...(draft as AdminProduct),
+            name,
+            cat,
+            sale,
+            ic,
+            image,
+            images,
+            price: priceRaw ? Number(priceRaw.replace(/[^\d]/g, "")) : null,
+            badge,
+            desc,
+            available,
+            variants: nextVariants,
+          };
 
       await Promise.resolve(onSave(base, isNew));
       setEditing(null);
@@ -247,13 +279,16 @@ export function ProductsView({
                           <div className="adm-cell-sub">
                             {p.id}
                             {storedProductImages(p).length > 1 ? ` · ${storedProductImages(p).length} عکس` : ""}
+                            {p.variants?.length ? ` · ${p.variants.length.toLocaleString("fa-IR")} گونه` : ""}
                           </div>
                         </div>
                       </div>
                     </td>
                     <td>{catName(p.cat)}</td>
                     <td>{p.sale === "w" ? "وزنی (کیلو)" : "عددی (بسته)"}</td>
-                    <td className="amount">{p.price === null ? "استعلامی" : `${fmtPrice(p.price)} تومان`}</td>
+                    <td className="amount">
+                      {p.price === null ? "استعلامی" : `${p.variants && p.variants.length > 1 ? "از " : ""}${fmtPrice(p.price)} تومان`}
+                    </td>
                     <td>{p.badge ? <span className="adm-pill adm-pill-progress">{p.badge}</span> : "—"}</td>
                     <td>
                       <label className="acc-switch">
@@ -360,10 +395,19 @@ export function ProductsView({
                 <label htmlFor="pf-badge">برچسب (اختیاری)</label>
                 <input id="pf-badge" name="badge" placeholder="مثلا: پرفروش" defaultValue={draft?.badge} />
               </div>
-              <div>
-                <label htmlFor="pf-price">قیمت (تومان) — خالی یعنی استعلامی</label>
-                <input id="pf-price" name="price" dir="ltr" placeholder="مثلا 830000" defaultValue={draft?.price ?? ""} />
-              </div>
+              {variants.length ? (
+                <div>
+                  <label>قیمت</label>
+                  <p className="hint" style={{ marginTop: 8 }}>
+                    این محصول گونه دارد؛ قیمت هر گونه پایین‌تر جدا تعیین می‌شود.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label htmlFor="pf-price">قیمت (تومان) — خالی یعنی استعلامی</label>
+                  <input id="pf-price" name="price" dir="ltr" placeholder="مثلا 830000" defaultValue={draft?.price ?? ""} />
+                </div>
+              )}
               <div style={{ gridColumn: "1 / -1" }}>
                 <label>نوع فروش</label>
                 <div style={{ display: "flex", gap: 18, paddingTop: 4 }}>
@@ -374,6 +418,65 @@ export function ProductsView({
                     <input type="radio" name="sale" value="u" defaultChecked={draft?.sale === "u"} style={{ width: "auto" }} /> عددی (بسته)
                   </label>
                 </div>
+              </div>
+              <div style={{ gridColumn: "1 / -1" }} className="adm-vr">
+                <div className="adm-vr-head">
+                  <div>
+                    <label style={{ margin: 0 }}>گونه‌ها (اندازه، بسته‌بندی، …)</label>
+                    <span className="hint">
+                      مثلا «ظرف ۴۰۰ گرمی» و «ظرف ۵۰۰ گرمی» — هرکدام قیمت و موجودی خودش. خالی بماند محصول ساده است. برای محصول وزنی، قیمت هر کیلو است.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-light btn-sm"
+                    disabled={variants.length >= MAX_VARIANTS}
+                    onClick={() =>
+                      setVariants((v) => [
+                        ...v,
+                        { key: `n${Date.now()}`, id: "", label: "", price: v.length ? "" : String(draft?.price ?? ""), available: true },
+                      ])
+                    }
+                  >
+                    <Icon name="plus" /> افزودن گونه
+                  </button>
+                </div>
+                {variants.map((v, i) => (
+                  <div className="adm-vr-row" key={v.key}>
+                    <input
+                      aria-label={`عنوان گونهٔ ${i + 1}`}
+                      placeholder="عنوان، مثلا ظرف ۴۰۰ گرمی"
+                      value={v.label}
+                      onChange={(e) => setVariants((rows) => rows.map((r) => (r.key === v.key ? { ...r, label: e.target.value } : r)))}
+                    />
+                    <input
+                      aria-label={`قیمت گونهٔ ${i + 1}`}
+                      dir="ltr"
+                      inputMode="numeric"
+                      placeholder="قیمت (خالی = استعلامی)"
+                      value={v.price}
+                      onChange={(e) => setVariants((rows) => rows.map((r) => (r.key === v.key ? { ...r, price: e.target.value } : r)))}
+                    />
+                    <label className="acc-switch" title={v.available ? "موجود" : "ناموجود"}>
+                      <input
+                        type="checkbox"
+                        aria-label={`موجود بودن گونهٔ ${i + 1}`}
+                        checked={v.available}
+                        onChange={(e) => setVariants((rows) => rows.map((r) => (r.key === v.key ? { ...r, available: e.target.checked } : r)))}
+                      />
+                      <span className="track" />
+                      <span className="thumb" />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      aria-label={`حذف گونهٔ ${i + 1}`}
+                      onClick={() => setVariants((rows) => rows.filter((r) => r.key !== v.key))}
+                    >
+                      <Icon name="trash" />
+                    </button>
+                  </div>
+                ))}
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label htmlFor="pf-desc">توضیحات</label>
